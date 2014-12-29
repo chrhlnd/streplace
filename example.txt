@@ -1,0 +1,32 @@
+this is a  command
+	,that continues to here
+
+literals 'are in quotes' or these "quotes
+that may end somwhere else"
+
+this 'is a command' that (some sub command for this param) calls sub commands
+
+someaction
+	,(depends on sub action)
+	,(and this sub action)
+
+# this is an eol commment
+
+#(
+	This is a block comment?
+
+	)#
+
+	#( something )#
+	
+
+superdata
+	,(somekey withval)
+	,(thiskey hasmoredata)
+	,(anotherkey withdata)
+	,(superkey (somedata
+					,(subkey value)
+					,(subkeyagain yes)
+					,(maybe data)
+				)
+	)

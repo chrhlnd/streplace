@@ -1,0 +1,124 @@
+#(
+	mysql
+		transformation rules
+)#
+
+tab (!cap table !gArg)
+innodb (!rcap table) (!set engine innodb)
+myisam (!rcap table) (!set engine myisam)
+memory (!rcap table) (!set engine memory)
+autoinc (!rcap table) (!set autoinc !gArg)
+dbname (!rcap table) (!set dbname !gArg)
+charset (!rcap table) (!set charset !gArg) 
+col (!rcap table) (!cap column !gArg)
+
+u64 (!rcap column) (!set type 'BIGINT UNSIGNED')
+i64 (!rcap column) (!set type 'BIGINT')
+u32 (!rcap column) (!set type 'INT UNSIGNED')
+i32 (!rcap column) (!set type 'INT')
+bool (!rcap column) (!set type 'TINYINT')
+
+bin (!rcap column) (!set type 'BINARY(' !gArg ')')
+vb  (!rcap column) (!set type 'VARBINARY(' !gArg ')')
+vc  (!rcap column) (!set type 'VARCHAR(' !gArg ')')
+dt  (!rcap column) (!set type 'DATETIME')
+ts  (!rcap column) (!set type 'TIMESTAMP') (!set ts ts)
+ch  (!rcap column) (!set type 'CHAR(' !gArg ')')
+bit (!rcap column) (!set type 'BIT(' !gArg ')')
+
+notnull (!rcap column) (!set nullable 'NOT NULL') (!set nn nn)
+null (!rcap column) (!set nullable 'NULL')
+
+ai (!rcap column) (!set ainc 'AUTO_INCREMENT')
+
+default (!rcap column) (!set default !gArg)
+
+
+primary (!rcap table) (!cap primary primary)
+unique (!rcap table) (!cap unique unique)
+key (!rcap table) (!cap key key)
+
+asc  (!rcap primary|unique|key) (!set cols !gArg 'ASC')
+desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
+
+!emit
+	,(table
+		,'DELIMITER $$' !eol
+		,'DROP PROCEDURE IF EXISTS `' (!get dbname) '`.`_setup_' (!get name) '` $$' !eol
+		,'CREATE PROCEDURE `' (!get dbname) '`.`_setup_' (!get name) '`()' !eol
+		,'proc:BEGIN' !eol
+		,'  SELECT "CHECKING table ' (!get dbname) '.' (!get name) '" as "Log";' !eol
+		,'  IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = "' (!get dbname) '" AND table_name = "' (!get name) '") = 0 THEN' !eol
+		,(!pad +4)
+		,!eol
+		,'SELECT "CREATING Missing table ' (!get dbname) '.' (!get name) '" as "Log";' !eol !eol
+		,'-- FULL table create' !eol
+		,(!pad +2)
+		,'CREATE TABLE `' (!get dbname) '`.`' (!get name) '` (' !eol
+		,(!emit
+			,(column
+				,'`' (!get name) '`'
+				,' '(!get type)
+				,(!if nullable ' ' (!get nullable))
+				,(!if ainc ' ' (!get ainc))
+				,(!if default ' DEFAULT ' (!get default))
+				,(!delim ',' !eol))
+			,(primary
+				,'PRIMARY KEY ('
+				,(!jclps cols 2 ',' '`' $1 '` ' $2)
+				,')'
+				,(!delim ',' !eol))
+			,(unique
+				,'UNIQUE KEY '
+				,'`uidx_' (!jclps cols 2 '_' $1) '`'
+				,' ('
+				,(!jclps cols 2 ',' '`' $1 '` ' $2)
+				,')'
+				,(!delim ',' !eol))
+			,(key
+				,'KEY '
+				,'`idx_' (!jclps cols 2 '_' $1) '`'
+				,' ('
+				,(!jclps cols 2 ',' '`' $1 '` ' $2)
+				,')'
+				,(!delim ',' !eol)))
+		,(!pad -2)
+		,!eol ') ENGINE=' (!get engine) 
+		,(!if autoinc ' AUTO_INCREMENT=' (!get autoinc))
+		,(!if charset ' DEFAULT CHARSET=' (!get charset))
+		,';' !eol
+		,(!pad -4)
+		,'-- FULL table create' !eol !eol
+		,'  ELSE' !eol
+		,(!pad +6) !eol
+		,(!emit
+			,(column
+		        ,'SELECT "CHECKING column ' (!pget dbname) '.' (!pget name) '.' (!get name) '" as "Log";' !eol !eol
+				,'IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = "'
+					,(!get dbname)
+					,'" AND table_name = "'
+					,(!pget name)
+					,'" AND column_name = "'
+					,(!get name)
+					,(!pad +2)
+					,'") = 0 THEN' !eol
+		        ,'SELECT "CREATING Missing column ' (!pget dbname) '.' (!pget name) '.' (!get name) '" as "Log";' !eol !eol
+				,'ALTER TABLE `' (!pget dbname) '`.`' (!pget name) '`' !eol
+				,' ADD COLUMN `' (!get name) '` ' (!get type)
+				,(!if nullable ' ' (!get nullable))
+				,(!if ainc ' ' (!get ainc))
+				,(!if default ' DEFAULT ' (!get default))
+				,(!if sibname ' AFTER `' (!get sibname) '`')
+				,';'
+				,(!if ts (!if nn !eol 'UPDATE `' (!pget dbname) '`.`' (!pget name) '` SET `' (!get name) '` = CURRENT_TIMESTAMP;'))
+				,(!pad -2) !eol
+				,'END IF;'
+				,!eol !eol))
+		,(!pad -6) !eol
+		,'  END IF;' !eol !eol
+		,'END$$' !eol
+		,'DELIMITER ;' !eol !eol
+		,'CALL `' (!get dbname) '`.`_setup_' (!get name) '`();' !eol
+		,'DROP PROCEDURE `' (!get dbname) '`.`_setup_' (!get name) '`;' !eol !eol
+		,)
+
