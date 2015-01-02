@@ -420,6 +420,10 @@ func (g *Grammer) evalIdent(current *capture, inTok cmdlang.TokInfo) error {
 			}
 		}
 
+		if current.RuleIdx == -1 { // no rule
+			return newTErr(inTok, "No rule found")
+		}
+
 		done, consumed, err := g.evalApplyRule(current, inTok, g.rules[current.RuleIdx])
 
 		if err != nil {

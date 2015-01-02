@@ -5,6 +5,7 @@ import (
 	"io"
 	//	"log"
 	"os"
+	"strings"
 
 	"github.com/chrhlnd/cmdlang"
 )
@@ -29,8 +30,77 @@ func evalGramFile(name string, file io.Reader) (*Grammer, bool) {
 	return nil, false
 }
 
-var gramFiles []string
-var looseFiles []string
+func showErrorToken(file io.Reader, tok cmdlang.TokInfo) {
+	scanner := cmdlang.NewScanner(file)
+
+	context := make([]cmdlang.TokInfo, 0, 10)
+
+	var inTok cmdlang.TokInfo
+
+	tokAt := 0
+
+	for inTok = scanner.Scan(); inTok.Token != cmdlang.TOK_EOF; inTok = scanner.Scan() {
+		context = append(context, inTok)
+
+		if inTok.Cstart == tok.Cstart && inTok.Cend == tok.Cend {
+			tokAt = len(context) - 1
+		}
+
+		if inTok.Lend > tok.Lend {
+			break
+		}
+	}
+
+	startAt := tokAt
+	ident := 0
+	for i := tokAt - 1; i > -1 && ident < 10; i-- {
+		if context[i].Token == cmdlang.TOK_IDENT {
+			ident++
+		}
+		startAt--
+	}
+
+	for i := startAt - 1; i > -1; i-- {
+		if context[i].Lstart != context[startAt].Lstart {
+			break
+		}
+	}
+
+	padStart := tokAt
+	for q := tokAt - 1; q > -1 && context[q].Lend == context[tokAt].Lstart; q-- {
+		padStart = q
+	}
+
+	doPad := func() {
+		for q := padStart; q < tokAt; q++ {
+			fmt.Print(strings.Replace(string(context[q].Literal), "\n", "", 1))
+		}
+	}
+
+	for i := startAt; i < len(context); i++ {
+		v := context[i]
+		if i == tokAt {
+			fmt.Println("\n Error @ line: ", v.Lstart, " -----------")
+
+			errv := string(v.Literal)
+
+			doPad()
+			fmt.Println(errv)
+			doPad()
+			for z := 0; z < len(errv); z++ {
+				fmt.Print("^")
+			}
+			fmt.Println("")
+			doPad()
+			for z := 0; z < len(errv); z++ {
+				fmt.Print(" ")
+			}
+
+		} else {
+			fmt.Print(string(v.Literal))
+		}
+	}
+}
 
 func main() {
 	arg0 := os.Args[0]
@@ -123,6 +193,15 @@ WORK:
 			err = gram.Transform(file, out)
 			if err != nil {
 				fmt.Println("Error: '", option, "': ", err)
+
+				if terr, ok := err.(TransformError); ok {
+					if _, serr := file.Seek(0, 0); serr != nil {
+						fmt.Println(serr)
+					} else {
+						showErrorToken(file, terr.Token)
+					}
+				}
+
 				exitNo = 1
 				break WORK
 			}
@@ -131,6 +210,11 @@ WORK:
 			file.Close()
 			file = nil
 		}
+	}
+
+	if file != nil {
+		file.Close()
+		file = nil
 	}
 	os.Exit(exitNo)
 }
