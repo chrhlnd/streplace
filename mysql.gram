@@ -160,5 +160,6 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 		,'DELIMITER ;' !eol !eol
 		,'CALL `' (!get dbname) '`.`_setup_' (!get name) '`();' !eol
 		,'DROP PROCEDURE `' (!get dbname) '`.`_setup_' (!get name) '`;' !eol !eol
+		,'SELECT "DONE!" as "Log"' !eol
 		,)
 
