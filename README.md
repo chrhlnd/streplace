@@ -35,9 +35,11 @@ The rules are simple specify words seperated by white space. Carrige return is a
 then it is an extension of the previous line.
 
 line comments are started with #
+
 block comments are using ear muffs #( )#
 
 '(' ')' pairs seperate sub commands/data. Its a way to have parent to child relationships.
+
 "'" '"' provide quoting escape so you can have words with spaces or other quotes
 
 ```
