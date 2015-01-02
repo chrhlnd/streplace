@@ -1,5 +1,6 @@
 ##streplace, maybe not the best name
 st      = structred
+
 replace = replace
 
 Although joined together it looks like string replace.
@@ -18,9 +19,13 @@ The main itch I'm scratching here is to support script generation for mysql. So 
 
 Command line help:
 
-Usage:  ./streplace [cmt <string>] <gram file> [files ...] ... [<gram file> [files...]]
+Usage:
+```
+./streplace [cmt <string>] <gram file> [files ...] ... [<gram file> [files...]]
+```
 
 ex:
+
 	./streplace gram ./mysql.gram ./example.tab	> example.tab.sql
 
 the example files are also here.
