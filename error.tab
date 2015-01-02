@@ -1,0 +1,33 @@
+#(
+	Examples
+)#
+
+
+tab account innodb
+	,(dbname crm)
+	,(autoinc 10000)
+	,(charset utf8)
+	,(col	id				u64			notnull	ai)
+	,(col	name			(vc 200)	null)
+	,(col	balance			i64			notnull	default	0)
+	,(col	important		(bit 1)		null)
+	,(col	main_phone		(vc 20)		null)
+	,(col	main_email		(vc 100)	null)
+	,(col	last_invoice	dt			null)
+	,(col	last_contact	dt			null)
+	,(col	created			ts			notnull default CURRENT_TIMESTAMP)
+	,(primary	(asc id))
+	,(unique	(asc name))
+	,(key		(asc name) (desc last_invoice))
+	,trash is going to be right here
+
+tab account_note innodb
+	,(dbname crm)
+	,(autoinc 10000)
+	,(charset utf8)
+	,(col	id			u64	notnull	ai)
+	,(col	account_id	u64	notnull)
+	,(col	note		txt	notnull)
+	,(col	created		ts	notnull default CURRENT_TIMESTAMP)
+	,(primary	(asc id))
+	,(key		(asc account_id))
