@@ -113,6 +113,39 @@ proc:BEGIN
       
   END IF;
 
+
+  SELECT "Checking Unique constraint crm.account.uidx_name" as "Log";
+  
+  IF (SELECT count(*) FROM information_schema.statistics
+       WHERE table_schema = "crm" AND
+             table_name   = "account" AND
+             column_name in ("name")
+       GROUP BY index_name HAVING count(*) > 1) < 0 
+    THEN
+    SELECT "Creating Unique constraint crm.account.uidx_name" as "Log";
+    
+    CREATE UNIQUE INDEX `uidx_name`
+     ON `crm`.`account`
+     (`name` ASC);
+    
+    
+  END IF;
+  SELECT "Checking constraint crm.account.idx_name_last_invoice" as "Log";
+  
+  IF (SELECT count(*) FROM information_schema.statistics
+       WHERE table_schema = "crm" AND
+             table_name   = "account" AND
+             column_name in ("name","last_invoice")
+       GROUP BY index_name HAVING count(*) > 1+1) < 0 
+    THEN
+    SELECT "Creating constraint crm.account.idx_name_last_invoice" as "Log";
+    
+    CREATE INDEX `idx_name_last_invoice`
+     ON `crm`.`account`
+     (`name` ASC,`last_invoice` DESC);
+    
+  END IF;
+  
 END$$
 DELIMITER ;
 
@@ -181,6 +214,23 @@ proc:BEGIN
       
   END IF;
 
+
+  SELECT "Checking constraint crm.account_note.idx_account_id" as "Log";
+  
+  IF (SELECT count(*) FROM information_schema.statistics
+       WHERE table_schema = "crm" AND
+             table_name   = "account_note" AND
+             column_name in ("account_id")
+       GROUP BY index_name HAVING count(*) > 1) < 0 
+    THEN
+    SELECT "Creating constraint crm.account_note.idx_account_id" as "Log";
+    
+    CREATE INDEX `idx_account_id`
+     ON `crm`.`account_note`
+     (`account_id` ASC);
+    
+  END IF;
+  
 END$$
 DELIMITER ;
 

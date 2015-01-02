@@ -25,6 +25,7 @@ dt  (!rcap column) (!set type 'DATETIME') (!set ts ts)
 ts  (!rcap column) (!set type 'TIMESTAMP') (!set ts ts)
 ch  (!rcap column) (!set type 'CHAR(' !gArg ')')
 bit (!rcap column) (!set type 'BIT(' !gArg ')')
+txt (!rcap column) (!set type 'TEXT')
 
 notnull (!rcap column) (!set nullable 'NOT NULL') (!set nn nn)
 null (!rcap column) (!set nullable 'NULL')
@@ -116,6 +117,45 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 				,!eol !eol))
 		,(!pad -6) !eol
 		,'  END IF;' !eol !eol
+		,(!pad +2) !eol
+		,(!emit
+			,(unique
+		        ,'SELECT "Checking Unique constraint ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
+				,'IF (SELECT count(*) FROM information_schema.statistics' !eol
+				,'     WHERE table_schema = "' (!get dbname) '" AND' !eol
+				,'           table_name   = "' (!pget name) '" AND' !eol
+				,'           column_name in (' (!jclps cols 2 ',' '"' $1 '"') ')' !eol
+				,'     GROUP BY index_name HAVING count(*) > ' (!jclps cols 2 '+' '1')
+				,(!pad +2)
+				,') < 0 ' !eol 'THEN' !eol
+		        ,'SELECT "Creating Unique constraint ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
+				,'CREATE UNIQUE INDEX '
+				,'`uidx_' (!jclps cols 2 '_' $1) '`' !eol
+				,' ON `' (!get dbname) '`.`' (!pget name) '`' !eol
+				,' ('
+				,(!jclps cols 2 ',' '`' $1 '` ' $2)
+				,');' !eol !eol
+				,(!pad -2) !eol
+				,"END IF;" !eol)
+			,(key
+		        ,'SELECT "Checking constraint ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
+				,'IF (SELECT count(*) FROM information_schema.statistics' !eol
+				,'     WHERE table_schema = "' (!get dbname) '" AND' !eol
+				,'           table_name   = "' (!pget name) '" AND' !eol
+				,'           column_name in (' (!jclps cols 2 ',' '"' $1 '"' ) ')' !eol
+				,'     GROUP BY index_name HAVING count(*) > ' (!jclps cols 2 '+' '1')
+				,(!pad +2)
+				,') < 0 ' !eol 'THEN' !eol
+		        ,'SELECT "Creating constraint ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
+				,'CREATE INDEX '
+				,'`idx_' (!jclps cols 2 '_' $1) '`' !eol
+				,' ON `' (!get dbname) '`.`' (!pget name) '`' !eol
+				,' ('
+				,(!jclps cols 2 ',' '`' $1 '` ' $2)
+				,');' !eol
+				,(!pad -2) !eol
+				,"END IF;" !eol))
+		,(!pad -2) !eol
 		,'END$$' !eol
 		,'DELIMITER ;' !eol !eol
 		,'CALL `' (!get dbname) '`.`_setup_' (!get name) '`();' !eol

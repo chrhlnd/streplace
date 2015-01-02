@@ -464,6 +464,7 @@ func (g *Grammer) Transform(in io.Reader, out io.Writer) error {
 				}
 			case cmdlang.TOK_BLOCK_START:
 				newCap := newCapture(curcap)
+				log.Print("Processing block from ", inTok)
 				if err := parse(newCap, depth+1); err != nil {
 					return err
 				}
