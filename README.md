@@ -1,4 +1,4 @@
-#streplace, maybe not the best name
+##streplace, maybe not the best name
 st      = structred
 replace = replace
 
@@ -26,7 +26,7 @@ ex:
 the example files are also here.
 
 
-#Short detour
+###Short detour
 github.com/chrhlnd/cmdlang
 
 Its a light weight format that feels natural for me to type, and has the possiblity of being stream interpreted.
