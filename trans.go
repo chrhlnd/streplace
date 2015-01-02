@@ -464,7 +464,7 @@ func (g *Grammer) Transform(in io.Reader, out io.Writer) error {
 				}
 			case cmdlang.TOK_BLOCK_START:
 				newCap := newCapture(curcap)
-				log.Print("Processing block from ", inTok)
+				// log.Print("Processing block from ", inTok)
 				if err := parse(newCap, depth+1); err != nil {
 					return err
 				}
@@ -586,7 +586,7 @@ func (g *Grammer) runEmit(erule emit, current *capture, outw io.Writer) error {
 			}
 		}
 	}
-	dump(&erule.ev, "")
+	//dump(&erule.ev, "")
 
 	logTok := func(v interface{}) string {
 		if vv, ok := v.(*cmdlang.TokInfo); ok {
@@ -623,7 +623,7 @@ func (g *Grammer) runEmit(erule emit, current *capture, outw io.Writer) error {
 		}
 	}
 
-	dumpData(current, "")
+	//dumpData(current, "")
 
 	isEmitTok := func(tok cmdlang.TokInfo) bool {
 		if bytes.Compare(tok.Literal, tEMIT) == 0 {

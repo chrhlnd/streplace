@@ -1,23 +1,16 @@
 package main
 
 import (
-	"bytes"
-	"flag"
 	"fmt"
 	"io"
+	//	"log"
 	"os"
 
 	"github.com/chrhlnd/cmdlang"
 )
 
-var grammers map[string]*Grammer
-
-func evalGramFile(name string, file io.Reader) {
+func evalGramFile(name string, file io.Reader) (*Grammer, bool) {
 	hadErr := false
-
-	if grammers == nil {
-		grammers = make(map[string]*Grammer)
-	}
 
 	errorRpt := func(tok cmdlang.TokInfo, err error) {
 		fmt.Print(name)
@@ -31,82 +24,113 @@ func evalGramFile(name string, file io.Reader) {
 
 	g := NewGrammer(file, errorRpt)
 	if !hadErr {
-		grammers[name] = g
+		return g, true
 	}
-
+	return nil, false
 }
 
 var gramFiles []string
 var looseFiles []string
 
 func main() {
-	flag.Parse()
+	arg0 := os.Args[0]
+	args := os.Args[1:]
 
-	modeGram := false
+	var gramName string
+	var gram *Grammer
+	var file *os.File
+	var err error
+	var out io.Writer
 
-	for _, f := range flag.Args() {
-		if f == "gram" {
-			modeGram = true
-			continue
-		}
+	out = os.Stdout
 
-		if modeGram {
-			gramFiles = append(gramFiles, f)
-			modeGram = false
-			continue
-		}
+	cmtPfx := "--"
 
-		looseFiles = append(looseFiles, f)
+	printHelp := func() {
+		fmt.Println("Usage: ", arg0, "[cmt <string>] <gram file> [files ...] ... [<gram file> [files...]]")
 	}
 
-	for _, g := range gramFiles {
-		file, err := os.Open(g)
-		if err != nil {
-			fmt.Print("GRAM ERR: ")
-			fmt.Println(err)
-			continue
-		}
-
-		evalGramFile(g, file)
-
-		file.Close()
+	if len(args) == 0 {
+		printHelp()
+		os.Exit(1)
 	}
 
-	for _, f := range looseFiles {
-		fmt.Println("-- ---->>>", f, " -----")
+	exitNo := 0
 
-		file, err := os.Open(f)
-		if err != nil {
-			fmt.Print("ERR: ")
-			fmt.Println(err)
-		} else {
-			for gname, g := range grammers {
-				fmt.Println("-- --- using: ", gname, " ----- ")
+WORK:
+	for i := 0; i < len(args); i++ {
+		option := args[i]
 
-				var buf bytes.Buffer
-				err := g.Transform(file, &buf)
-				if err != nil {
-					fmt.Print("ERROR:")
-					fmt.Println(err)
-					fmt.Print("Parsed:\n", buf.String(), "\n")
-				}
-				fmt.Println(buf.String())
+		//log.Println("Handling arg ", i, " ", option)
+
+		switch option {
+		case "cmt":
+			i++
+			if i > len(args) {
+				fmt.Println("Error: ", arg0, " cmt <str>, expected string argument")
+				printHelp()
+				exitNo = 1
+				break WORK
+			}
+			cmtPfx = args[i]
+			//log.Println("Set comment to ", cmtPfx)
+		case "gram":
+			i++
+			if i > len(args) {
+				fmt.Println("Error: ", arg0, " gram <grammer file>, expected grammer file")
+				printHelp()
+				exitNo = 1
+				break WORK
 			}
 
-			/*
-				scanner := cmdlang.NewScanner(file)
+			gramName = args[i]
 
-				var tok cmdlang.TokInfo
+			file, err = os.Open(gramName)
+			if err != nil {
+				fmt.Println("Error: '", gramName, "':  ", err)
+				exitNo = 1
+				break WORK
+			}
 
-				for tok = scanner.Scan(); tok.Token != cmdlang.TOK_EOF; tok = scanner.Scan() {
-					fmt.Printf("%v\n", tok)
-				}
-				fmt.Printf("%v\n", tok)
+			if g, ok := evalGramFile(gramName, file); !ok {
+				exitNo = 1
+				break WORK
+			} else {
+				gram = g
+				//log.Println("Set gram ", gramName, " to ", gram)
+			}
 
-			*/
 			file.Close()
-		}
+			file = nil
+		default:
+			if gram == nil {
+				fmt.Println("Error: no grammer file to process '", option, "' exiting")
+				printHelp()
+				exitNo = 1
+				break WORK
+			}
+			//log.Println("Processing ", option)
+			fmt.Fprintln(out, cmtPfx, " begin ", option)
+			fmt.Fprintln(out, cmtPfx, " applying ", gramName)
 
-		fmt.Println("-- ----<<< ", f, " -----")
+			file, err = os.Open(option)
+			if err != nil {
+				fmt.Println("Error: '", option, "':  ", err)
+				exitNo = 1
+				break WORK
+			}
+
+			err = gram.Transform(file, out)
+			if err != nil {
+				fmt.Println("Error: '", option, "': ", err)
+				exitNo = 1
+				break WORK
+			}
+
+			fmt.Fprintln(out, cmtPfx, " end ", option)
+			file.Close()
+			file = nil
+		}
 	}
+	os.Exit(exitNo)
 }
