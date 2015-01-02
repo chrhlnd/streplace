@@ -48,11 +48,11 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 		,'DROP PROCEDURE IF EXISTS `' (!get dbname) '`.`_setup_' (!get name) '` $$' !eol
 		,'CREATE PROCEDURE `' (!get dbname) '`.`_setup_' (!get name) '`()' !eol
 		,'proc:BEGIN' !eol
-		,'  SELECT "CHECKING table ' (!get dbname) '.' (!get name) '" as "Log";' !eol
+		,'  SELECT "check TABLE ' (!get dbname) '.' (!get name) '" as "Log";' !eol
 		,'  IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = "' (!get dbname) '" AND table_name = "' (!get name) '") = 0 THEN' !eol
 		,(!pad +4)
 		,!eol
-		,'SELECT "CREATING Missing table ' (!get dbname) '.' (!get name) '" as "Log";' !eol !eol
+		,'SELECT "create TABLE ' (!get dbname) '.' (!get name) '" as "Log";' !eol !eol
 		,'-- FULL table create' !eol
 		,(!pad +2)
 		,'CREATE TABLE `' (!get dbname) '`.`' (!get name) '` (' !eol
@@ -94,7 +94,7 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 		,(!pad +6) !eol
 		,(!emit
 			,(column
-		        ,'SELECT "CHECKING column ' (!pget dbname) '.' (!pget name) '.' (!get name) '" as "Log";' !eol !eol
+		        ,'SELECT "check COLUMN ' (!pget dbname) '.' (!pget name) '.' (!get name) '" as "Log";' !eol !eol
 				,'IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = "'
 					,(!get dbname)
 					,'" AND table_name = "'
@@ -103,7 +103,7 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 					,(!get name)
 					,(!pad +2)
 					,'") = 0 THEN' !eol
-		        ,'SELECT "CREATING Missing column ' (!pget dbname) '.' (!pget name) '.' (!get name) '" as "Log";' !eol !eol
+		        ,'SELECT "create COLUMN ' (!pget dbname) '.' (!pget name) '.' (!get name) '" as "Log";' !eol !eol
 				,'ALTER TABLE `' (!pget dbname) '`.`' (!pget name) '`' !eol
 				,' ADD COLUMN `' (!get name) '` ' (!get type)
 				,(!if nullable ' ' (!get nullable))
@@ -120,15 +120,15 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 		,(!pad +2) !eol
 		,(!emit
 			,(unique
-		        ,'SELECT "Checking Unique constraint ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
+		        ,'SELECT "check UNIQUE INDEX ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
 				,'IF (SELECT count(*) FROM information_schema.statistics' !eol
 				,'     WHERE table_schema = "' (!get dbname) '" AND' !eol
 				,'           table_name   = "' (!pget name) '" AND' !eol
 				,'           column_name in (' (!jclps cols 2 ',' '"' $1 '"') ')' !eol
-				,'     GROUP BY index_name HAVING count(*) > ' (!jclps cols 2 '+' '1')
+				,'     GROUP BY index_name HAVING count(*) > ' (!jclps cols 2 '+' '1') ' - 1 LIMIT 1'
 				,(!pad +2)
-				,') < 0 ' !eol 'THEN' !eol
-		        ,'SELECT "Creating Unique constraint ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
+				,') IS NULL ' !eol 'THEN' !eol
+		        ,'SELECT "create UNIQUE INDEX ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
 				,'CREATE UNIQUE INDEX '
 				,'`uidx_' (!jclps cols 2 '_' $1) '`' !eol
 				,' ON `' (!get dbname) '`.`' (!pget name) '`' !eol
@@ -138,15 +138,15 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 				,(!pad -2) !eol
 				,"END IF;" !eol)
 			,(key
-		        ,'SELECT "Checking constraint ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
+		        ,'SELECT "check INDEX ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
 				,'IF (SELECT count(*) FROM information_schema.statistics' !eol
 				,'     WHERE table_schema = "' (!get dbname) '" AND' !eol
 				,'           table_name   = "' (!pget name) '" AND' !eol
 				,'           column_name in (' (!jclps cols 2 ',' '"' $1 '"' ) ')' !eol
-				,'     GROUP BY index_name HAVING count(*) > ' (!jclps cols 2 '+' '1')
+				,'     GROUP BY index_name HAVING count(*) > ' (!jclps cols 2 '+' '1') ' - 1 LIMIT 1'
 				,(!pad +2)
-				,') < 0 ' !eol 'THEN' !eol
-		        ,'SELECT "Creating constraint ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
+				,') IS NULL ' !eol 'THEN' !eol
+		        ,'SELECT "create INDEX ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
 				,'CREATE INDEX '
 				,'`idx_' (!jclps cols 2 '_' $1) '`' !eol
 				,' ON `' (!get dbname) '`.`' (!pget name) '`' !eol

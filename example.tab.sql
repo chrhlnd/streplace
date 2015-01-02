@@ -120,7 +120,7 @@ proc:BEGIN
        WHERE table_schema = "crm" AND
              table_name   = "account" AND
              column_name in ("name")
-       GROUP BY index_name HAVING count(*) > 1) < 0 
+       GROUP BY index_name HAVING count(*) > 1) IS NULL 
     THEN
     SELECT "Creating Unique constraint crm.account.uidx_name" as "Log";
     
@@ -136,7 +136,7 @@ proc:BEGIN
        WHERE table_schema = "crm" AND
              table_name   = "account" AND
              column_name in ("name","last_invoice")
-       GROUP BY index_name HAVING count(*) > 1+1) < 0 
+       GROUP BY index_name HAVING count(*) > 1+1) IS NULL 
     THEN
     SELECT "Creating constraint crm.account.idx_name_last_invoice" as "Log";
     
@@ -221,7 +221,7 @@ proc:BEGIN
        WHERE table_schema = "crm" AND
              table_name   = "account_note" AND
              column_name in ("account_id")
-       GROUP BY index_name HAVING count(*) > 1) < 0 
+       GROUP BY index_name HAVING count(*) > 1) IS NULL 
     THEN
     SELECT "Creating constraint crm.account_note.idx_account_id" as "Log";
     
