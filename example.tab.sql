@@ -1,5 +1,5 @@
 --  begin  ./example.tab
---  applying  ./mysql.gram
+--  applying  mysql.gram
 DELIMITER $$
 DROP PROCEDURE IF EXISTS `crm`.`_setup_account` $$
 CREATE PROCEDURE `crm`.`_setup_account`()
@@ -89,6 +89,7 @@ proc:BEGIN
         
         ALTER TABLE `crm`.`account`
          ADD COLUMN `last_invoice` DATETIME NULL AFTER `main_email`;
+        
       END IF;
       
       SELECT "check COLUMN crm.account.last_contact" as "Log";
@@ -98,6 +99,7 @@ proc:BEGIN
         
         ALTER TABLE `crm`.`account`
          ADD COLUMN `last_contact` DATETIME NULL AFTER `last_invoice`;
+        
       END IF;
       
       SELECT "check COLUMN crm.account.created" as "Log";

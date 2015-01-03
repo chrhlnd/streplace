@@ -111,7 +111,7 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 				,(!if default ' DEFAULT ' (!get default))
 				,(!if sibname ' AFTER `' (!get sibname) '`')
 				,';'
-				,(!if ts (!if nn !eol 'UPDATE `' (!pget dbname) '`.`' (!pget name) '` SET `' (!get name) '` = CURRENT_TIMESTAMP;'))
+				,(!if ts !eol (!if nn 'UPDATE `' (!pget dbname) '`.`' (!pget name) '` SET `' (!get name) '` = CURRENT_TIMESTAMP;'))
 				,(!pad -2) !eol
 				,'END IF;'
 				,!eol !eol))

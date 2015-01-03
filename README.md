@@ -1,5 +1,5 @@
 ##streplace, maybe not the best name
-st      = structred
+st      = structured
 
 replace = replace
 
@@ -12,6 +12,8 @@ The main use of this program is to injest structured data and paste out formatte
 Much like a templating system.
 
 There is a small grammer dialect that is definable in the program that can buildup collections from the data.
+
+The collections can then be pushed through transformation logic to emit whatever. ATM I have mysql table/index structure scripts happening.
 
 The data itself, and the grammer difinitions are tokenized by another library
 

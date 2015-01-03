@@ -125,6 +125,7 @@ func (c *capture) setVar(name string, val interface{}) {
 }
 
 var gARG = []byte("!gArg")
+var gARGS = []byte("!gArgs")
 
 func newCapture(p *capture) *capture {
 	ret := &capture{}
@@ -298,25 +299,38 @@ func makeSetNamedByVar(vname string) Processor {
 			}
 		}
 
-		if isGArg(rtok.Literal) {
-			if tok, ok := ctok(); ok {
-				if lst != nil {
-					lst = append(lst, *tok)
-					Settings[name] = lst
-				} else {
-					Settings[name] = *tok
-				}
-				rs.inc()
-			}
-		} else {
+		var setTok *cmdlang.TokInfo
+		var didwork bool
+
+		if bytes.Compare(rtok.Literal, gARG) == 0 {
+			setTok, didwork = ctok()
+			goto HANDLE_TOKEN
+		}
+
+		if bytes.Compare(rtok.Literal, gARGS) == 0 {
+			setTok, didwork = ctok()
+			goto HANDLE_TOKEN
+		}
+
+		//default case
+		didwork = true
+		setTok = &rtok
+
+	HANDLE_TOKEN:
+
+		if didwork {
 			if lst != nil {
-				lst = append(lst, rtok)
+				lst = append(lst, *setTok)
 				Settings[name] = lst
 			} else {
-				Settings[name] = rtok
+				Settings[name] = *setTok
 			}
-			rs.inc()
+
+			if bytes.Compare(rtok.Literal, gARGS) != 0 {
+				rs.inc()
+			} // else ... gArgs captures all remaining arguments
 		}
+
 		return nil
 	}
 
@@ -506,18 +520,8 @@ func (g *Grammer) Transform(in io.Reader, out io.Writer) error {
 	}
 
 	return nil
-
 }
 
-var tPAD = []byte("!pad")
-var tDELIM = []byte("!delim")
-var tJCLPS = []byte("!jclps")
-var tEMIT = []byte("!emit")
-var tGET = []byte("!get")
-var tPGET = []byte("!pget")
-var tJOIN = []byte("!join")
-var tWRAP = []byte("!wrap")
-var tIF = []byte("!if")
 var tEOL = []byte("!eol")
 var vEOL = []byte(fmt.Sprintf("\n"))
 
@@ -538,8 +542,6 @@ func (ow *outWriter) Write(data []byte) (int, error) {
 	}
 	return ow.dowrite(data)
 }
-
-var dSpace = []byte(" ")
 
 func (ow *outWriter) dowrite(data []byte) (int, error) {
 	if bytes.Compare(data, tEOL) == 0 {
@@ -564,421 +566,541 @@ func (ow *outWriter) dowrite(data []byte) (int, error) {
 	}
 }
 
-func (g *Grammer) runEmit(erule emit, current *capture, outw io.Writer) error {
-	var dump func(ev *eval, pad string)
+var dSpace = []byte(" ")
 
-	out := &outWriter{outw, nil, 0}
+type EmitHandler func(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error)
 
-	dump = func(ev *eval, pad string) {
-		for i := 0; i < len(ev.items); i++ {
-			tok := ev.getTok(i)
-			if tok != nil {
-				buf := bytes.Buffer{}
-				buf.WriteString(pad)
-				buf.WriteString(strconv.Itoa(i))
-				buf.WriteString(") ")
-				buf.Write(tok.Literal)
+type EmitDirective struct {
+	Tag     []byte
+	Handler EmitHandler
+}
 
-				log.Print(buf.String())
-			}
+var _emitDirectives []EmitDirective
 
-			child := ev.getEval(i)
-			if child != nil {
-				log.Print(pad, strconv.Itoa(i), ")")
-
-				dump(child, pad+" ")
-			}
+func getDirectiveTable() []EmitDirective {
+	if _emitDirectives == nil {
+		_emitDirectives = []EmitDirective{EmitDirective{[]byte("!pad"), handlePad},
+			EmitDirective{[]byte("!delim"), handleDelim},
+			EmitDirective{[]byte("!jclps"), handleJoinColapse},
+			EmitDirective{[]byte("!emit"), handleEmit},
+			EmitDirective{[]byte("!get"), handleGet},
+			EmitDirective{[]byte("!pget"), handlePGet},
+			EmitDirective{[]byte("!join"), handleJoin},
+			EmitDirective{[]byte("!wrap"), handleWrap},
+			EmitDirective{[]byte("!if"), handleIf},
+			EmitDirective{[]byte("!len"), handleLen},
 		}
 	}
-	//dump(&erule.ev, "")
+	return _emitDirectives
+}
 
-	logTok := func(v interface{}) string {
-		if vv, ok := v.(*cmdlang.TokInfo); ok {
-			return string(vv.Literal)
+func dumpEval(ev *eval, pad string) {
+	for i := 0; i < len(ev.items); i++ {
+		tok := ev.getTok(i)
+		if tok != nil {
+			buf := bytes.Buffer{}
+			buf.WriteString(pad)
+			buf.WriteString(strconv.Itoa(i))
+			buf.WriteString(") ")
+			buf.Write(tok.Literal)
+
+			log.Print(buf.String())
 		}
-		if vv, ok := v.(cmdlang.TokInfo); ok {
-			return string(vv.Literal)
+
+		child := ev.getEval(i)
+		if child != nil {
+			log.Print(pad, strconv.Itoa(i), ")")
+			dumpEval(child, pad+" ")
 		}
-		return fmt.Sprintf("%v", v)
 	}
+}
 
-	var dumpData func(data *capture, pad string)
-	dumpData = func(data *capture, pad string) {
-		if data.Type != nil {
-			log.Print(pad, "type: ", string(data.Type.Literal), ":")
+func logTok(v interface{}) string {
+	if vv, ok := v.(*cmdlang.TokInfo); ok {
+		return string(vv.Literal)
+	}
+	if vv, ok := v.(cmdlang.TokInfo); ok {
+		return string(vv.Literal)
+	}
+	return fmt.Sprintf("%v", v)
+}
+
+func dumpData(data *capture, pad string) {
+	if data.Type != nil {
+		log.Print(pad, "type: ", string(data.Type.Literal), ":")
+	} else {
+		log.Print(pad, "Empty type:")
+	}
+	pad += " "
+	for k, v := range data.Settings {
+		if lst, ok := v.([]interface{}); ok {
+			log.Print(pad, "setting: ", k)
+
+			for i, vv := range lst {
+				log.Print(pad+" ", strconv.Itoa(i), ")")
+				log.Print(pad+" ", "->", logTok(vv))
+			}
 		} else {
-			log.Print(pad, "Empty type:")
-		}
-		pad += " "
-		for k, v := range data.Settings {
-			if lst, ok := v.([]interface{}); ok {
-				log.Print(pad, "setting: ", k)
-
-				for i, vv := range lst {
-					log.Print(pad+" ", strconv.Itoa(i), ")")
-					log.Print(pad+" ", "->", logTok(vv))
-				}
-			} else {
-				log.Print(pad, "setting: ", k, " = ", logTok(v))
-			}
-		}
-		for _, v := range data.Children {
-			dumpData(v, pad+"  ")
+			log.Print(pad, "setting: ", k, " = ", logTok(v))
 		}
 	}
+	for _, v := range data.Children {
+		dumpData(v, pad+"  ")
+	}
+}
+
+func dispatchEval(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	if first.Token != cmdlang.TOK_IDENT {
+		return true, nil
+	}
+
+	for _, v := range getDirectiveTable() {
+		if bytes.Compare(v.Tag, first.Literal) == 0 {
+			//log.Printf("Calling %v", string(v.Tag))
+			return v.Handler(data, first, ev, out)
+		}
+	}
+
+	return false, newTErr(first, "Un handled command %v", string(first.Literal))
+}
+
+type wResult struct {
+	Items [][]byte
+}
+
+func (wr *wResult) Reset() {
+	wr.Items = nil
+}
+
+func (wr *wResult) Write(d []byte) {
+	wr.Items = append(wr.Items, d)
+}
+
+func (wr *wResult) String() string {
+	buf := bytes.Buffer{}
+	for _, v := range wr.Items {
+		buf.Write(v)
+	}
+	return buf.String()
+}
+
+func (wr *wResult) Bytes() []byte {
+	buf := bytes.Buffer{}
+	for _, v := range wr.Items {
+		buf.Write(v)
+	}
+	return buf.Bytes()
+}
+
+func getEvalItem(data *capture, first cmdlang.TokInfo, ev *eval, pos int, result *wResult) error {
+	if len(ev.items) <= pos {
+		return newTErr(first, "Expected param {0} but wasn't found", pos)
+	}
+
+	if tok := ev.getTok(pos); tok != nil {
+		result.Write(tok.Literal)
+		return nil
+	}
+
+	if subev := ev.getEval(pos); subev != nil {
+		buf := bytes.Buffer{}
+		if ok, err := dispatchEval(data, *subev.getTok(0), subev, &outWriter{&buf, nil, 0}); ok {
+			result.Write(buf.Bytes())
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
+func handleDelim(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	for i := 1; i < len(ev.items); i++ {
+		buf := wResult{}
+
+		if err := getEvalItem(data, first, ev, i, &buf); err != nil {
+			return true, err
+		}
+
+		for _, v := range buf.Items {
+			log.Println("Setting delim.. appending ", string(v))
+			out.delim = append(out.delim, cmdlang.TokInfo{Literal: v})
+		}
+	}
+
+	return true, nil
+}
+
+func handleJoinColapse(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	var err error
+
+	buf := wResult{}
+
+	if err = getEvalItem(data, first, ev, 1, &buf); err != nil {
+		return true, err
+	}
+
+	setting := buf.String()
+
+	buf.Reset()
+
+	if err = getEvalItem(data, first, ev, 2, &buf); err != nil {
+		return true, err
+	}
+
+	var groupno int
+
+	if groupno, err = strconv.Atoi(buf.String()); err != nil {
+		return true, err
+	}
+
+	buf.Reset()
+
+	if err = getEvalItem(data, first, ev, 3, &buf); err != nil {
+		return true, err
+	}
+
+	delim := buf.Bytes()
+
+	buf = wResult{}
+
+	buf.Reset()
+
+	var lst []interface{}
+
+	if lst = data.getSettingAsList(setting); lst == nil { // no data to operate on
+		return true, nil
+	}
+
+	grouping := 0
+	wrote := false
+
+	writeItem := func(d []byte) {
+		if !wrote {
+			wrote = true
+			if grouping > 0 {
+				out.Write(delim)
+			}
+		}
+		out.Write(d)
+	}
+
+	for i := 0; i+(groupno-1) < len(lst); i += groupno {
+		if wrote {
+			grouping++
+			wrote = false
+		}
+
+		for q := 4; q < len(ev.items); q++ {
+			buf.Reset()
+			if err = getEvalItem(data, first, ev, q, &buf); err != nil {
+				return true, err
+			}
+
+			tok := buf.Bytes()
+
+			if tok[0] != '$' {
+				writeItem(tok)
+				continue
+			}
+
+			var n int
+			if n, err = strconv.Atoi(string(tok[1:])); err != nil {
+				return true, err
+			}
+
+			// have an element parameter
+			switch tok := lst[i+(n-1)].(type) {
+			case cmdlang.TokInfo:
+				writeItem(tok.Literal)
+			case *cmdlang.TokInfo:
+				writeItem(tok.Literal)
+			default:
+				writeItem([]byte(fmt.Sprintf("%v", lst[i+(n-1)])))
+			}
+		}
+	}
+	return true, nil
+}
+
+func handleEmit(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	for i := 1; i < len(ev.items); i++ {
+		if tok := ev.getTok(i); tok != nil {
+			out.Write(tok.Literal)
+			continue
+		}
+
+		if sube := ev.getEval(i); sube != nil {
+			ctx := sube.getTok(0).Literal
+
+			var lastName *cmdlang.TokInfo
+			for _, ccap := range data.Children {
+				if bytes.Compare(ccap.Type.Literal, ctx) == 0 {
+					if lastName != nil {
+						ccap.Settings["sibname"] = *lastName
+					}
+
+					// walk params object emiting literals and interping sub commands
+					for i := 1; i < len(sube.items); i++ {
+						if subtok := sube.getTok(i); subtok != nil {
+							out.Write(subtok.Literal)
+							continue
+						}
+
+						if ssev := sube.getEval(i); ssev != nil {
+							if ok, err := dispatchEval(ccap, *ssev.getTok(0), ssev, out); !ok || err != nil {
+								return ok, err
+							}
+						}
+					}
+
+					delete(ccap.Settings, "sibname")
+					if ln, ok := ccap.Settings["name"].(cmdlang.TokInfo); ok {
+						lastName = &ln
+					}
+				}
+			}
+		}
+	}
+	out.delim = nil
+	return true, nil
+}
+
+func handleGet(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	buf := wResult{}
+
+	for i := 1; i < len(ev.items); i++ {
+		buf.Reset()
+
+		if err := getEvalItem(data, first, ev, i, &buf); err != nil {
+			return true, err
+		}
+
+		setting := buf.String()
+
+		var lst []interface{}
+		if lst = data.getSettingAsList(setting); lst == nil {
+			continue
+		}
+
+		for _, v := range lst {
+			switch tv := v.(type) {
+			case cmdlang.TokInfo:
+				out.Write(tv.Literal)
+			case *cmdlang.TokInfo:
+				out.Write(tv.Literal)
+			default:
+				out.Write([]byte(fmt.Sprintf("%v", v)))
+			}
+		}
+
+	}
+
+	return true, nil
+}
+
+func handlePGet(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	if data.Parent == nil {
+		return true, newTErr(first, "No Parent for context")
+	}
+
+	return handleGet(data.Parent, first, ev, out)
+}
+
+func handleJoin(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	buf := wResult{}
+
+	if err := getEvalItem(data, first, ev, 1, &buf); err != nil {
+		return true, err
+	}
+
+	delim := buf.Bytes()
+
+	buf.Reset()
+
+	emitCount := 0
+
+	for i := 2; i < len(ev.items); i++ {
+		if emitCount > 0 {
+			out.Write(delim)
+		}
+
+		buf.Reset()
+
+		if err := getEvalItem(data, first, ev, i, &buf); err != nil {
+			return true, err
+		}
+
+		out.Write(buf.Bytes())
+
+		emitCount++
+	}
+	return true, nil
+}
+
+func handleWrap(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	buf := wResult{}
+
+	if err := getEvalItem(data, first, ev, 1, &buf); err != nil {
+		return true, err
+	}
+
+	wrap := buf.Bytes()
+
+	buf.Reset()
+
+	out.Write(wrap)
+
+	for i := 2; i < len(ev.items); i++ {
+		buf.Reset()
+		if err := getEvalItem(data, first, ev, i, &buf); err != nil {
+			return true, err
+		}
+		out.Write(buf.Bytes())
+	}
+
+	out.Write(wrap)
+
+	return true, nil
+}
+
+func handleIf(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	buf := wResult{}
+
+	if err := getEvalItem(data, first, ev, 1, &buf); err != nil {
+		return true, err
+	}
+
+	setting := buf.String()
+
+	if _, ok := data.Settings[setting]; !ok {
+		return true, nil // eval false
+	}
+
+	for i := 2; i < len(ev.items); i++ {
+		buf.Reset()
+		if err := getEvalItem(data, first, ev, i, &buf); err != nil {
+			return true, err
+		}
+		for _, v := range buf.Items {
+			out.Write(v)
+		}
+	}
+	return true, nil
+}
+
+var chZERO = []byte("0")
+
+func handleLen(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	buf := wResult{}
+
+	if err := getEvalItem(data, first, ev, 1, &buf); err != nil {
+		return true, err
+	}
+
+	setting := buf.String()
+
+	if lst := data.getSettingAsList(setting); lst == nil {
+		out.Write(chZERO)
+		return true, nil
+	} else {
+		out.Write([]byte(strconv.Itoa(len(lst))))
+	}
+
+	return true, nil
+}
+
+func handlePad(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	buf := wResult{}
+
+	if err := getEvalItem(data, first, ev, 1, &buf); err != nil {
+		return true, err
+	}
+
+	val := buf.Bytes()
+
+	switch val[0] {
+	case '+':
+		if v, err := strconv.Atoi(string(val[1:])); err != nil {
+			return true, err
+		} else {
+			out.pad += v
+		}
+	case '-':
+		if v, err := strconv.Atoi(string(val[1:])); err != nil {
+			return true, err
+		} else {
+			out.pad -= v
+		}
+	default:
+		if v, err := strconv.Atoi(string(val)); err != nil {
+			return true, err
+		} else {
+			out.pad = v
+		}
+	}
+
+	return true, nil
+}
+
+func (g *Grammer) runEmit(erule emit, current *capture, outw io.Writer) error {
+	out := &outWriter{outw, nil, 0}
 
 	//dumpData(current, "")
 
-	isEmitTok := func(tok cmdlang.TokInfo) bool {
-		if bytes.Compare(tok.Literal, tEMIT) == 0 {
-			return true
-		}
-		return false
+	first := erule.ev.getTok(0)
+
+	routed, err := dispatchEval(current, *first, &erule.ev, out)
+	if err != nil {
+		return err
 	}
+	if !routed {
+		return newTErr(*first, "Unable to handle command '%v'", string(first.Literal))
+	}
+	return nil
 
-	var handleAsCommand func(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error)
-
-	handleAsCommand = func(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
-		if bytes.Compare(first.Literal, tPAD) == 0 {
-			if pad := ev.getTok(1); pad != nil {
-				parse := pad.Literal
-
-				pos := false
-				neg := false
-
-				if parse[0] == '+' {
-					parse = parse[1:]
-					pos = true
-				} else if parse[0] == '-' {
-					parse = parse[1:]
-					neg = true
-				}
-
-				if v, err := strconv.Atoi(string(parse)); err == nil {
-					if pos {
-						out.pad += v
-					} else if neg {
-						out.pad -= v
-					} else {
-						out.pad = v
-					}
-				}
+	/*
+		isEmitTok := func(tok cmdlang.TokInfo) bool {
+			if bytes.Compare(tok.Literal, tEMIT) == 0 {
+				return true
 			}
-			return true, nil
-		}
-		//var tJCLPS = []byte("!jclps")
-
-		// format !jclps 'setting' <group #> <delim> [formats...] $1 = $X
-		if bytes.Compare(first.Literal, tJCLPS) == 0 {
-			if len(ev.items) < 4 {
-				return true, newTErr(first, "Invalid jclps command expected at least 4 args")
-			}
-			setting := ev.getTok(1)
-			if setting == nil {
-				return true, newTErr(first, "Invalid param expecting token")
-			}
-			var groupno int
-			if tok := ev.getTok(2); tok != nil {
-				var err error
-				if groupno, err = strconv.Atoi(string(tok.Literal)); err != nil {
-					return true, newTErr(first, "Failed parsing group size %v", err)
-				}
-			} else {
-				return true, newTErr(first, "Invalid param expecting token")
-			}
-			delim := ev.getTok(3)
-			if delim == nil {
-				return true, newTErr(first, "Invalid param expecting token")
-			}
-			lst := data.getSettingAsList(string(setting.Literal))
-			if lst != nil {
-				wcnt := 0
-				for i := 0; i+(groupno-1) < len(lst); i += groupno {
-					wrote := false
-
-					wtt := func(d []byte) {
-						if !wrote {
-							wrote = true
-							if wcnt > 0 {
-								out.Write(delim.Literal)
-							}
-						}
-						out.Write(d)
-					}
-
-					for q := 4; q < len(ev.items); q++ {
-						if tok := ev.getTok(q); tok != nil {
-							if tok.Literal[0] == '$' {
-								if n, err := strconv.Atoi(string(tok.Literal[1:])); err != nil {
-									return true, newTErr(*tok, "Invalid capture index expected number %v", err)
-								} else {
-									if tok, ok := lst[i+(n-1)].(cmdlang.TokInfo); ok {
-										wtt(tok.Literal)
-										continue
-									}
-									if tok, ok := lst[i+(n-1)].(*cmdlang.TokInfo); ok {
-										wtt(tok.Literal)
-										continue
-									}
-									wtt([]byte(fmt.Sprintf("%v", lst[i+(n-1)])))
-								}
-							} else {
-								wtt(tok.Literal)
-							}
-						}
-					}
-
-					if wrote {
-						wcnt++
-					}
-
-				}
-			}
-			return true, nil
+			return false
 		}
 
-		if bytes.Compare(first.Literal, tDELIM) == 0 {
-			for i := 1; i < len(ev.items); i++ {
-				if tok := ev.getTok(i); tok != nil {
-					out.delim = append(out.delim, *tok)
-					continue
-				}
+				var printOut func(data *capture, ev *eval) error
 
-				if subev := ev.getEval(i); subev != nil {
-					buf := bytes.Buffer{}
-					if ok, err := handleAsCommand(data, *subev.getTok(0), subev, &outWriter{&buf, nil, 0}); ok {
-						if err != nil {
-							return true, err
-						}
-					} else {
-						return true, newTErr(*subev.getTok(0), "Unhandled token type for !delim command")
+				printOut = func(data *capture, ev *eval) error {
+					// 1st token sets the type or is !emit which causes us to iterate on child captures
+
+					first := ev.getTok(0)
+
+					if isEmitTok(*first) {
+						// walk params 1 at a time against child captures
 					}
-					out.delim = append(out.delim, cmdlang.TokInfo{Literal: buf.Bytes()})
-				}
-			}
-			return true, nil
-		}
 
-		if bytes.Compare(first.Literal, tIF) == 0 {
-			if test := ev.getTok(1); test != nil {
-				if _, ok := data.Settings[string(test.Literal)]; ok {
-					for i := 2; i < len(ev.items); i++ {
+					if ok, err := handleAsCommand(data, *first, ev, out); ok {
+						return err
+					}
+
+					if bytes.Compare(data.Type.Literal, first.Literal) != 0 {
+						return newTErr(*first, "Capture type was [%v] eval had [%v], eval was %v", string(data.Type.Literal), string(first.Literal), ev)
+					}
+
+					for i := 1; i < len(ev.items); i++ {
 						if tok := ev.getTok(i); tok != nil {
 							out.Write(tok.Literal)
 							continue
 						}
 
-						if subev := ev.getEval(i); subev != nil {
-							if ok, err := handleAsCommand(data, *subev.getTok(0), subev, out); ok {
-								if err != nil {
-									return true, err
-								}
-							} else {
-								return true, newTErr(*subev.getTok(0), "Expected sub command in if true clause")
-							}
-						}
-					}
-				}
-				return true, nil
-			} else {
-				return true, newTErr(first, "Expected param to be token for var test")
-			}
-		}
-
-		runGet := func(data *capture, ev *eval, start int, end int, out *outWriter) (bool, error) {
-			for i := start; i < end; i++ {
-				if tok := ev.getTok(i); tok != nil {
-					if stok := data.getSettingAsList(string(tok.Literal)); stok != nil {
-						for _, v := range stok {
-							if vv, ok := v.(cmdlang.TokInfo); ok {
-								out.Write(vv.Literal)
-								continue
-							}
-							if vv, ok := v.(*cmdlang.TokInfo); ok {
-								out.Write(vv.Literal)
-								continue
-							}
-							out.Write([]byte(fmt.Sprintf("%v", v)))
-						}
-						continue
-					}
-				}
-
-				if subev := ev.getEval(i); subev != nil {
-					if ok, err := handleAsCommand(data, *subev.getTok(0), subev, out); ok {
-						if err != nil {
-							return true, err
-						}
-					} else {
-						return true, newTErr(*subev.getTok(0), "Unhandled token type for !get command")
-					}
-				}
-			}
-			return true, nil
-		}
-
-		if bytes.Compare(first.Literal, tGET) == 0 {
-			return runGet(data, ev, 1, len(ev.items), out)
-		}
-
-		if bytes.Compare(first.Literal, tPGET) == 0 {
-			return runGet(data.Parent, ev, 1, len(ev.items), out)
-		}
-
-		if bytes.Compare(first.Literal, tJOIN) == 0 {
-			var delim []byte
-
-			if wtok := ev.getTok(1); wtok != nil {
-				delim = wtok.Literal
-			}
-			if wtoke := ev.getEval(1); wtoke != nil {
-				buf := bytes.Buffer{}
-				if ok, err := handleAsCommand(data, *wtoke.getTok(0), wtoke, &outWriter{&buf, nil, 0}); ok {
-					if err != nil {
-						return true, err
-					}
-					delim = buf.Bytes()
-				} else {
-					return true, newTErr(*wtoke.getTok(0), "Unable to resolve join delimieter")
-				}
-			}
-
-			ecnt := 0
-			for i := 2; i < len(ev.items); i++ {
-				if ecnt > 0 {
-					out.Write(delim)
-				}
-
-				if tok := ev.getTok(i); tok != nil {
-					if stok := data.getSettingToken(string(tok.Literal)); stok != nil {
-						out.Write(stok.Literal)
-						continue
-					}
-					out.Write(tok.Literal)
-				}
-
-				if subev := ev.getEval(i); subev != nil {
-					if ok, err := handleAsCommand(data, *subev.getTok(0), subev, out); ok {
-						if err != nil {
-							return true, err
-						}
-					} else {
-						return true, newTErr(*subev.getTok(0), "Unhandled token type for !join command")
-					}
-
-				}
-				ecnt++
-			}
-			return true, nil
-		}
-
-		if bytes.Compare(first.Literal, tWRAP) == 0 {
-			var wrap []byte
-
-			if wtok := ev.getTok(1); wtok != nil {
-				wrap = wtok.Literal
-			}
-			if wtoke := ev.getEval(1); wtoke != nil {
-				buf := bytes.Buffer{}
-				if ok, err := handleAsCommand(data, *wtoke.getTok(0), wtoke, &outWriter{&buf, nil, 0}); ok {
-					if err != nil {
-						return true, err
-					}
-					wrap = buf.Bytes()
-				} else {
-					return true, newTErr(*wtoke.getTok(0), "Unable to resolve wrap value")
-				}
-			}
-
-			for i := 2; i < len(ev.items); i++ {
-				out.Write(wrap)
-
-				if tok := ev.getTok(i); tok != nil {
-					out.Write(tok.Literal)
-				}
-
-				if toke := ev.getEval(i); toke != nil {
-					if ok, err := handleAsCommand(data, *toke.getTok(0), toke, out); ok {
-						if err != nil {
-							return true, err
-						}
-					} else {
-						return true, newTErr(*toke.getTok(0), "Unable to resolve wrap data")
-					}
-				}
-
-				out.Write(wrap)
-			}
-		}
-		return false, nil
-	}
-
-	var printOut func(data *capture, ev *eval) error
-
-	printOut = func(data *capture, ev *eval) error {
-		// 1st token sets the type or is !emit which causes us to iterate on child captures
-
-		first := ev.getTok(0)
-
-		if isEmitTok(*first) {
-			// walk params 1 at a time against child captures
-			for i := 1; i < len(ev.items); i++ {
-				if tok := ev.getTok(i); tok != nil {
-					out.Write(tok.Literal)
-					continue
-				}
-
-				if sube := ev.getEval(i); sube != nil {
-					ctx := sube.getTok(0).Literal
-
-					var lastName *cmdlang.TokInfo
-
-					for _, ccap := range data.Children {
-						if bytes.Compare(ccap.Type.Literal, ctx) == 0 {
-
-							if lastName != nil {
-								ccap.Settings["sibname"] = *lastName
-							}
-
-							if err := printOut(ccap, sube); err != nil {
+						child := ev.getEval(i)
+						if child != nil {
+							if err := printOut(data, child); err != nil {
 								return err
 							}
-
-							delete(ccap.Settings, "sibname")
-							if ln, ok := ccap.Settings["name"].(cmdlang.TokInfo); ok {
-								lastName = &ln
-							}
 						}
 					}
+					return nil
 				}
-			}
-			out.delim = nil
-			return nil
-		}
+			return printOut(current, &erule.ev)
+	*/
 
-		if ok, err := handleAsCommand(data, *first, ev, out); ok {
-			return err
-		}
-
-		if bytes.Compare(data.Type.Literal, first.Literal) != 0 {
-			return newTErr(*first, "Capture type was [%v] eval had [%v], eval was %v", string(data.Type.Literal), string(first.Literal), ev)
-		}
-
-		for i := 1; i < len(ev.items); i++ {
-			if tok := ev.getTok(i); tok != nil {
-				out.Write(tok.Literal)
-				continue
-			}
-
-			child := ev.getEval(i)
-			if child != nil {
-				if err := printOut(data, child); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-
-	return printOut(current, &erule.ev)
 }
