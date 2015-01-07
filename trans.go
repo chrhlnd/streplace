@@ -588,6 +588,7 @@ func getDirectiveTable() []EmitDirective {
 			EmitDirective{[]byte("!join"), handleJoin},
 			EmitDirective{[]byte("!wrap"), handleWrap},
 			EmitDirective{[]byte("!if"), handleIf},
+			EmitDirective{[]byte("!ifn"), handleIfNot},
 			EmitDirective{[]byte("!len"), handleLen},
 		}
 	}
@@ -960,6 +961,31 @@ func handleWrap(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) 
 
 	out.Write(wrap)
 
+	return true, nil
+}
+
+func handleIfNot(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	buf := wResult{}
+
+	if err := getEvalItem(data, first, ev, 1, &buf); err != nil {
+		return true, err
+	}
+
+	setting := buf.String()
+
+	if _, ok := data.Settings[setting]; !ok {
+		return false, nil // eval false
+	}
+
+	for i := 2; i < len(ev.items); i++ {
+		buf.Reset()
+		if err := getEvalItem(data, first, ev, i, &buf); err != nil {
+			return true, err
+		}
+		for _, v := range buf.Items {
+			out.Write(v)
+		}
+	}
 	return true, nil
 }
 
