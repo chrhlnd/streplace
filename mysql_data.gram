@@ -1,0 +1,23 @@
+#(
+	mysql data
+		transformation rules
+)#
+
+tab (!cap table !gArg)
+col (!rcap table) (!set cols !gArg)
+dbname (!rcap table) (!set dbname !gArg)
+d (!cap data !gArgs)
+
+!emit
+	,(table
+		,'TRUNCATE TABLE `' (!get dbname) '`.`' (!get name) '`;' !eol
+		,'ALTER TABLE `' (!get dbname) '`.`' (!get name) '` AUTO_INCREMENT = 1;' !eol
+		,'INSERT INTO `' (!get dbname) '`.`' (!get name) '` ( '
+		,'`' (!jclps cols 1 '`,`' $1) '`'
+		,') VALUES ') !eol
+!emit
+	,(data
+		,'(' (!jclps name 1 ',' $1) ')' !eol (!delim ','))
+!emit ';' !eol
+
+

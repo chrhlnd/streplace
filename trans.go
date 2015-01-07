@@ -187,10 +187,6 @@ func restoreRuleState(current *capture, evRule rule) (bool, *eval, *rulestate, i
 	return false, ruleEv, ruleState, depth
 }
 
-func isGArg(data []byte) bool {
-	return bytes.Compare(data, gARG) == 0
-}
-
 func setCapture(capt *capture, rtok cmdlang.TokInfo, ctok tConsumer, rs *rulestate) error {
 	rs.inc()
 	capt.Settings["!cap"] = rtok
@@ -200,10 +196,28 @@ func setCapture(capt *capture, rtok cmdlang.TokInfo, ctok tConsumer, rs *rulesta
 }
 
 func setName(capt *capture, rtok cmdlang.TokInfo, ctok tConsumer, rs *rulestate) error {
-	if isGArg(rtok.Literal) {
+	if bytes.Compare(rtok.Literal, gARG) == 0 {
 		if tok, ok := ctok(); ok {
 			rs.inc()
 			capt.Settings["name"] = *tok
+		}
+	} else if bytes.Compare(rtok.Literal, gARGS) == 0 {
+		rs.Process = setName
+
+		// eat everything until the catpure ends
+		if tok, ok := ctok(); ok {
+			var lst []interface{}
+
+			if v, ok := capt.Settings["name"]; ok {
+				if lv, ok := v.([]interface{}); ok {
+					lst = lv
+				} else {
+					lst = append(lst, v)
+				}
+			}
+
+			lst = append(lst, *tok)
+			capt.Settings["name"] = lst
 		}
 	} else {
 		rs.inc()
@@ -262,7 +276,7 @@ func makeRunList(funcs ...Processor) Processor {
 
 func makeVarCapture(vname string) Processor {
 	return func(capt *capture, rtok cmdlang.TokInfo, ctok tConsumer, rs *rulestate) error {
-		if isGArg(rtok.Literal) {
+		if bytes.Compare(rtok.Literal, gARG) == 0 {
 			if tok, ok := ctok(); ok {
 				capt.setVar(vname, string(tok.Literal))
 				rs.inc()
@@ -328,7 +342,10 @@ func makeSetNamedByVar(vname string) Processor {
 
 			if bytes.Compare(rtok.Literal, gARGS) != 0 {
 				rs.inc()
-			} // else ... gArgs captures all remaining arguments
+			}
+			//} else {
+			//	log.Print("in !gArgs capturing more")
+			//}
 		}
 
 		return nil
@@ -723,7 +740,7 @@ func handleDelim(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter)
 		}
 
 		for _, v := range buf.Items {
-			log.Println("Setting delim.. appending ", string(v))
+			//log.Println("Setting delim.. appending ", string(v))
 			out.delim = append(out.delim, cmdlang.TokInfo{Literal: v})
 		}
 	}

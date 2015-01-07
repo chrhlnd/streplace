@@ -78,10 +78,10 @@ func (g *Grammer) addEmit(e emit) {
 	g.emits = append(g.emits, e)
 }
 
-var cEMIT = [...]byte{'!', 'e', 'm', 'i', 't'}
+var cEMIT = []byte("!emit")
 
 func (g *Grammer) handleEmit(ev eval, err ErrRpt) bool {
-	if tok := ev.getTok(0); bytes.Compare(tok.Literal, cEMIT[0:]) != 0 {
+	if tok := ev.getTok(0); bytes.Compare(tok.Literal, cEMIT) != 0 {
 		return false
 	}
 
