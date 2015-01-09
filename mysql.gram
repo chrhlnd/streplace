@@ -71,14 +71,14 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 				,(!delim ',' !eol))
 			,(unique
 				,'UNIQUE KEY '
-				,'`uidx_' (!jclps cols 2 '_' $1) '`'
+				,'`uidx_' (!md5 (!jclps cols 2 '_' $1)) '`'
 				,' ('
 				,(!jclps cols 2 ',' '`' $1 '` ' $2)
 				,')'
 				,(!delim ',' !eol))
 			,(key
 				,'KEY '
-				,'`idx_' (!jclps cols 2 '_' $1) '`'
+				,'`idx_' (!md5 (!jclps cols 2 '_' $1)) '`'
 				,' ('
 				,(!jclps cols 2 ',' '`' $1 '` ' $2)
 				,')'
@@ -120,7 +120,7 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 		,(!pad +2) !eol
 		,(!emit
 			,(unique
-		        ,'SELECT "check UNIQUE INDEX ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
+		        ,'SELECT "check UNIQUE INDEX ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!md5 (!jclps cols 2 '_' $1)) '" as "Log";' !eol !eol
 				,'IF (SELECT count(*) FROM information_schema.statistics' !eol
 				,'     WHERE table_schema = "' (!get dbname) '" AND' !eol
 				,'           table_name   = "' (!pget name) '" AND' !eol
@@ -128,9 +128,9 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 				,'     GROUP BY index_name HAVING count(*) > ' (!jclps cols 2 '+' '1') ' - 1 LIMIT 1'
 				,(!pad +2)
 				,') IS NULL ' !eol 'THEN' !eol
-		        ,'SELECT "create UNIQUE INDEX ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
+		        ,'SELECT "create UNIQUE INDEX ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!md5 (!jclps cols 2 '_' $1)) '" as "Log";' !eol !eol
 				,'CREATE UNIQUE INDEX '
-				,'`uidx_' (!jclps cols 2 '_' $1) '`' !eol
+				,'`uidx_' (!md5 (!jclps cols 2 '_' $1)) '`' !eol
 				,' ON `' (!get dbname) '`.`' (!pget name) '`' !eol
 				,' ('
 				,(!jclps cols 2 ',' '`' $1 '` ' $2)
@@ -138,7 +138,7 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 				,(!pad -2) !eol
 				,"END IF;" !eol)
 			,(key
-		        ,'SELECT "check INDEX ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
+		        ,'SELECT "check INDEX ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!md5 (!jclps cols 2 '_' $1)) '" as "Log";' !eol !eol
 				,'IF (SELECT count(*) FROM information_schema.statistics' !eol
 				,'     WHERE table_schema = "' (!get dbname) '" AND' !eol
 				,'           table_name   = "' (!pget name) '" AND' !eol
@@ -146,9 +146,9 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 				,'     GROUP BY index_name HAVING count(*) > ' (!jclps cols 2 '+' '1') ' - 1 LIMIT 1'
 				,(!pad +2)
 				,') IS NULL ' !eol 'THEN' !eol
-		        ,'SELECT "create INDEX ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!jclps cols 2 '_' $1) '" as "Log";' !eol !eol
+		        ,'SELECT "create INDEX ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!md5 (!jclps cols 2 '_' $1)) '" as "Log";' !eol !eol
 				,'CREATE INDEX '
-				,'`idx_' (!jclps cols 2 '_' $1) '`' !eol
+				,'`idx_' (!md5 (!jclps cols 2 '_' $1)) '`' !eol
 				,' ON `' (!get dbname) '`.`' (!pget name) '`' !eol
 				,' ('
 				,(!jclps cols 2 ',' '`' $1 '` ' $2)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
 	"fmt"
 	"io"
 	"log"
@@ -607,6 +608,7 @@ func getDirectiveTable() []EmitDirective {
 			EmitDirective{[]byte("!if"), handleIf},
 			EmitDirective{[]byte("!ifn"), handleIfNot},
 			EmitDirective{[]byte("!len"), handleLen},
+			EmitDirective{[]byte("!md5"), handleMd5},
 		}
 	}
 	return _emitDirectives
@@ -1047,6 +1049,23 @@ func handleLen(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (
 		return true, nil
 	} else {
 		out.Write([]byte(strconv.Itoa(len(lst))))
+	}
+
+	return true, nil
+}
+
+func handleMd5(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	buf := wResult{}
+
+	for i := 1; i < len(ev.items); i++ {
+		buf.Reset()
+		if err := getEvalItem(data, first, ev, i, &buf); err != nil {
+			return true, err
+		}
+
+		hashed := fmt.Sprintf("%x", md5.Sum(buf.Bytes()))
+
+		out.Write([]byte(hashed))
 	}
 
 	return true, nil
