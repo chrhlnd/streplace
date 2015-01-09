@@ -990,8 +990,8 @@ func handleIfNot(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter)
 
 	setting := buf.String()
 
-	if _, ok := data.Settings[setting]; !ok {
-		return false, nil // eval false
+	if _, ok := data.Settings[setting]; ok {
+		return true, nil
 	}
 
 	for i := 2; i < len(ev.items); i++ {
