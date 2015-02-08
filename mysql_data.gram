@@ -6,7 +6,7 @@
 tab (!cap table !gArg)
 col (!rcap table) (!set cols !gArg)
 dbname (!rcap table) (!set dbname !gArg)
-d (!cap data !gArgs)
+d (!rcap table) (!cap data !gArgs)
 
 !emit
 	,(table
@@ -14,10 +14,10 @@ d (!cap data !gArgs)
 		,'ALTER TABLE `' (!get dbname) '`.`' (!get name) '` AUTO_INCREMENT = 1;' !eol
 		,'INSERT INTO `' (!get dbname) '`.`' (!get name) '` ( '
 		,'`' (!jclps cols 1 '`,`' $1) '`'
-		,') VALUES ') !eol
-!emit
-	,(data
-		,'(' (!jclps name 1 ',' $1) ')' !eol (!delim ','))
-!emit ';' !eol
+		,') VALUES ' !eol
+		,(!emit
+			,(data
+				,'(' (!jclps name 1 ',' $1) ')' !eol (!delim ',')))
+		,';' !eol)
 
 

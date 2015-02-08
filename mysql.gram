@@ -16,8 +16,13 @@ u64 (!rcap column) (!set type 'BIGINT UNSIGNED')
 i64 (!rcap column) (!set type 'BIGINT')
 u32 (!rcap column) (!set type 'INT UNSIGNED')
 i32 (!rcap column) (!set type 'INT')
+u16 (!rcap column) (!set type 'SMALLINT UNSIGNED')
+i16 (!rcap column) (!set type 'SMALLINT')
 bool (!rcap column) (!set type 'TINYINT')
+f32 (!rcap column) (!set type 'FLOAT')
 
+dec (!rcap column) (!set type 'DECIMAL(' !gArg ')')
+enum (!rcap column) (!set type 'enum(' !gArg ')')
 bin (!rcap column) (!set type 'BINARY(' !gArg ')')
 vb  (!rcap column) (!set type 'VARBINARY(' !gArg ')')
 vc  (!rcap column) (!set type 'VARCHAR(' !gArg ')')
@@ -34,7 +39,6 @@ ai (!rcap column) (!set ainc 'AUTO_INCREMENT')
 
 default (!rcap column) (!set default !gArg)
 
-
 primary (!rcap table) (!cap primary primary)
 unique (!rcap table) (!cap unique unique)
 key (!rcap table) (!cap key key)
@@ -48,11 +52,11 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 		,'DROP PROCEDURE IF EXISTS `' (!get dbname) '`.`_setup_' (!get name) '` $$' !eol
 		,'CREATE PROCEDURE `' (!get dbname) '`.`_setup_' (!get name) '`()' !eol
 		,'proc:BEGIN' !eol
-		,'  SELECT "check TABLE ' (!get dbname) '.' (!get name) '" as "Log";' !eol
+		,'  SELECT "check TABLE ' (!get dbname) '.' (!get name) '";' !eol
 		,'  IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = "' (!get dbname) '" AND table_name = "' (!get name) '") = 0 THEN' !eol
 		,(!pad +4)
 		,!eol
-		,'SELECT "create TABLE ' (!get dbname) '.' (!get name) '" as "Log";' !eol !eol
+		,'SELECT "create TABLE ' (!get dbname) '.' (!get name) '";' !eol !eol
 		,'-- FULL table create' !eol
 		,(!pad +2)
 		,'CREATE TABLE `' (!get dbname) '`.`' (!get name) '` (' !eol
@@ -94,7 +98,7 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 		,(!pad +6) !eol
 		,(!emit
 			,(column
-		        ,'SELECT "check COLUMN ' (!pget dbname) '.' (!pget name) '.' (!get name) '" as "Log";' !eol !eol
+		        ,'SELECT "check COLUMN ' (!pget dbname) '.' (!pget name) '.' (!get name) '";' !eol !eol
 				,'IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = "'
 					,(!get dbname)
 					,'" AND table_name = "'
@@ -103,15 +107,37 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 					,(!get name)
 					,(!pad +2)
 					,'") = 0 THEN' !eol
-		        ,'SELECT "create COLUMN ' (!pget dbname) '.' (!pget name) '.' (!get name) '" as "Log";' !eol !eol
+		        ,'SELECT "create COLUMN ' (!pget dbname) '.' (!pget name) '.' (!get name) '";' !eol !eol
 				,'ALTER TABLE `' (!pget dbname) '`.`' (!pget name) '`' !eol
 				,' ADD COLUMN `' (!get name) '` ' (!get type)
 				,(!if nullable ' ' (!get nullable))
-				,(!if ainc ' ' (!get ainc))
 				,(!if default ' DEFAULT ' (!get default))
 				,(!if sibname ' AFTER `' (!get sibname) '`')
 				,';'
 				,(!if ts !eol (!if nn 'UPDATE `' (!pget dbname) '`.`' (!pget name) '` SET `' (!get name) '` = CURRENT_TIMESTAMP;'))
+				,(!pad -2) !eol
+				,'END IF;' !eol
+				,'IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = "' (!get dbname) '"'
+					,(!pad +2) !eol
+					,' AND table_name = "' (!pget name) '"' !eol
+					,' AND column_name = "' (!get name) '"' !eol
+					,' AND column_type like replace("%' (!get type) '%"," ","%")' !eol
+					,' AND replace(replace(is_nullable,"NO","NOT NULL"),"YES","NULL") = "' (!get nullable) '"' !eol
+					,(!if ainc ' AND extra = "AUTO_INCREMENT"' !eol)
+					,(!ifn ainc ' AND extra != "AUTO_INCREMENT"' !eol)
+					,(!pad -2)
+					,(!if default (!if ts ' AND column_default = "' (!get default) '"'))
+					,(!if default (!ifn ts ' AND column_default = '(!get default)))
+					,(!ifn default (!ifn ts ' AND column_default IS NULL '))
+					,(!ifn default (!if ts ' AND (column_default IS NULL OR column_default = "0000-00-00 00:00:00")'))
+					,') = 0 ' !eol 'THEN' (!pad +2) !eol
+		        ,'SELECT "change COLUMN ' (!pget dbname) '.' (!pget name) '.' (!get name) '";' !eol !eol
+				,'ALTER TABLE `' (!pget dbname) '`.`' (!pget name) '`' !eol
+				,' CHANGE COLUMN `' (!get name) '` `' (!get name) '` ' (!get type)
+				,(!if nullable ' ' (!get nullable))
+				,(!if default ' DEFAULT ' (!get default))
+				,(!if sibname ' AFTER `' (!get sibname) '`')
+				,';'
 				,(!pad -2) !eol
 				,'END IF;'
 				,!eol !eol))
@@ -119,8 +145,36 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 		,'  END IF;' !eol !eol
 		,(!pad +2) !eol
 		,(!emit
+			,(primary
+		        ,'SELECT "check PRIMARY INDEX ' (!pget dbname) '.' (!pget name) '.PRIMARY";' !eol !eol
+				,'IF (SELECT count(*) FROM information_schema.statistics' !eol
+				,'     WHERE table_schema = "' (!get dbname) '" AND' !eol
+				,'           table_name   = "' (!pget name) '" AND' !eol
+				,'           column_name in (' (!jclps cols 2 ',' '"' $1 '"') ') AND' !eol
+				,'           index_name = "PRIMARY"' !eol
+				,'     GROUP BY index_name HAVING count(*) > ' (!jclps cols 2 '+' '1') ' - 1 LIMIT 1'
+				,(!pad +2)
+				,') IS NULL ' !eol 'THEN' !eol
+		        ,'SELECT "adding PRIMARY KEY ' (!pget dbname) '.' (!pget name) '.' 'PRIMARY";' !eol !eol
+				,'IF (SELECT count(*) FROM information_schema.statistics' !eol
+				,'     WHERE table_schema = "' (!get dbname) '" AND' !eol
+				,'           table_name   = "' (!pget name) '" AND' !eol
+				,'           index_name = "PRIMARY"'
+				,(!pad +2)
+				,') = 0 THEN' !eol
+				,'ALTER TABLE `' (!get dbname) '`.`' (!pget name) '` ADD PRIMARY KEY ('
+				,(!pad -2)
+				,(!jclps cols 2 ',' $1 ' ' $2) ');' !eol
+				,'ELSE '
+				,(!pad +2) !eol
+				,(!pad -2)
+				,'ALTER TABLE `' (!get dbname) '`.`' (!pget name) '` DROP PRIMARY KEY, ADD PRIMARY KEY ('
+				,(!jclps cols 2 ',' $1 ' ' $2) ');' !eol
+				,(!pad -2)
+				,'END IF;' !eol
+				,"END IF;" !eol !eol)
 			,(unique
-		        ,'SELECT "check UNIQUE INDEX ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!md5 (!jclps cols 2 '_' $1)) '" as "Log";' !eol !eol
+		        ,'SELECT "check UNIQUE INDEX ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!md5 (!jclps cols 2 '_' $1)) '";' !eol !eol
 				,'IF (SELECT count(*) FROM information_schema.statistics' !eol
 				,'     WHERE table_schema = "' (!get dbname) '" AND' !eol
 				,'           table_name   = "' (!pget name) '" AND' !eol
@@ -128,7 +182,7 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 				,'     GROUP BY index_name HAVING count(*) > ' (!jclps cols 2 '+' '1') ' - 1 LIMIT 1'
 				,(!pad +2)
 				,') IS NULL ' !eol 'THEN' !eol
-		        ,'SELECT "create UNIQUE INDEX ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!md5 (!jclps cols 2 '_' $1)) '" as "Log";' !eol !eol
+		        ,'SELECT "create UNIQUE INDEX ' (!pget dbname) '.' (!pget name) '.' 'uidx_' (!md5 (!jclps cols 2 '_' $1)) '";' !eol !eol
 				,'CREATE UNIQUE INDEX '
 				,'`uidx_' (!md5 (!jclps cols 2 '_' $1)) '`' !eol
 				,' ON `' (!get dbname) '`.`' (!pget name) '`' !eol
@@ -138,7 +192,7 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 				,(!pad -2) !eol
 				,"END IF;" !eol)
 			,(key
-		        ,'SELECT "check INDEX ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!md5 (!jclps cols 2 '_' $1)) '" as "Log";' !eol !eol
+		        ,'SELECT "check INDEX ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!md5 (!jclps cols 2 '_' $1)) '";' !eol !eol
 				,'IF (SELECT count(*) FROM information_schema.statistics' !eol
 				,'     WHERE table_schema = "' (!get dbname) '" AND' !eol
 				,'           table_name   = "' (!pget name) '" AND' !eol
@@ -146,7 +200,7 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 				,'     GROUP BY index_name HAVING count(*) > ' (!jclps cols 2 '+' '1') ' - 1 LIMIT 1'
 				,(!pad +2)
 				,') IS NULL ' !eol 'THEN' !eol
-		        ,'SELECT "create INDEX ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!md5 (!jclps cols 2 '_' $1)) '" as "Log";' !eol !eol
+		        ,'SELECT "create INDEX ' (!pget dbname) '.' (!pget name) '.' 'idx_' (!md5 (!jclps cols 2 '_' $1)) '";' !eol !eol
 				,'CREATE INDEX '
 				,'`idx_' (!md5 (!jclps cols 2 '_' $1)) '`' !eol
 				,' ON `' (!get dbname) '`.`' (!pget name) '`' !eol
@@ -155,11 +209,31 @@ desc (!rcap primary|unique|key) (!set cols !gArg 'DESC')
 				,');' !eol
 				,(!pad -2) !eol
 				,"END IF;" !eol))
+		,(!emit
+			,(column
+				,(!if ainc
+					,(!pad +2) !eol
+					,'SELECT "patching AUTO_INCREMENT ' (!pget dbname) '.' (!pget name) '";' !eol
+					,'IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = "' (!get dbname) '"'
+					,(!pad +2) !eol
+					,' AND table_name = "' (!pget name) '"' !eol
+					,' AND column_name = "' (!get name) '"' !eol
+					,' AND extra = "AUTO_INCREMENT") = 0 ' !eol
+					,'THEN' !eol
+					,'ALTER TABLE `' (!pget dbname) '`.`' (!pget name) '`' !eol
+					,' CHANGE COLUMN `' (!get name) '` `' (!get name) '` ' (!get type)
+					,(!if nullable ' ' (!get nullable))
+					,(!if default ' DEFAULT ' (!get default))
+					,(!if ainc ' AUTO_INCREMENT ')
+					,';' !eol
+					,(!pad -2)
+					,'END IF;' !eol
+					,(!pad -2) !eol)))
 		,(!pad -2) !eol
 		,'END$$' !eol
 		,'DELIMITER ;' !eol !eol
 		,'CALL `' (!get dbname) '`.`_setup_' (!get name) '`();' !eol
 		,'DROP PROCEDURE `' (!get dbname) '`.`_setup_' (!get name) '`;' !eol !eol
-		,'SELECT "DONE with ' (!get name) '" as "Log";' !eol !eol
+		,'SELECT "DONE with ' (!get name) '";' !eol !eol
 		,)
 

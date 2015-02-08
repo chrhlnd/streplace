@@ -1,30 +1,30 @@
-tab reward_payouts
+tab payouts
   ,(dbname game)
-  ,(col reward_id)
-  ,(col payout_id)
+  ,(col code)
+  ,(col payid)
   ,(col quanity)
-  ,(col reward_type)
-  ,(col linked_payout)
-  ,(col chance_of_linked_payout)
+  ,(col type)
+  ,(col linked)
+  ,(col linked_chance)
   ,(col description)
-  ,(col expire_sec)
-d '"1 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"2 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"3 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"4 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"5 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"6 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"7 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"8 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"9 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"10 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"11 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"12 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"13 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"14 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"15 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"16 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"17 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"18 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
-d '"19 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL
+  ,(col exp)
+  ,(d '"1 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"2 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"3 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"4 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"5 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"6 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"7 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"8 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"9 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"10 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"11 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"12 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"13 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"14 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"15 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"16 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"17 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"18 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
+  ,(d '"19 FunReward"' '"SOME SUPER CODE"' 1 '"COOL_ITEM"' NULL NULL NULL NULL)
 
