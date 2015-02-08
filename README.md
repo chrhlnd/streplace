@@ -49,6 +49,42 @@ The project I used this for I wrote some stored procs to script out database tab
 for all the devs on the project. They can use mysql tools to create tables like normal then script them out as .tab files and check them into version
 control or update existing ones. Then the build system just scripts everything in the .tab files and applies it to various environment databases to apply upgrades.
 
+What does this all mean:
+
+mysql.gram = convert 'table' structure files in to nice safe 'add/alter' scripts to apply to MySQL
+
+mysql_data.gram = convert 'data' structure files trunc/insert statments to force apply 'config' data an application uses
+
+```
+Project repository:
+	/Database/tables/
+		schema.table1.tab
+		schema.table2.tab
+		schema.tableX.tab
+
+	/Database/config/
+		schema.<sys_config_data>.tab
+
+```
+
+
+```
+Build system pulls
+	repo:/Database/tables/*.tab
+		pipe through 'streplace gram mysql.gram <file>.tab >> full_update.sql'
+	repo:/Database/config/*.tab
+		pipe through 'streplace gram mysql_data.gram <file>.tab >> full_update.sql'
+
+
+```
+... later apply updates to whatever deployment environment ..
+
+
+```
+	mysql <connection params> < full_update.sql
+```
+		
+
 ###Short detour
 github.com/chrhlnd/cmdlang
 
