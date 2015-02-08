@@ -17,8 +17,9 @@ The collections can then be pushed through transformation logic to emit whatever
 
 The data itself, and the grammer difinitions are tokenized by another library
 
+Other databases or other things could also be scripted, currently MySQL is the main purpose of this project, I just made it generic.
 
-## MySQL scripting
+## USE CASE: MySQL scripting
 The main itch I'm scratching here is to support script generation for mysql. So the grammer file is here along with an example.
 
 Command line help:
