@@ -56,6 +56,8 @@ mysql.gram = convert 'table' structure files in to nice safe 'add/alter' scripts
 
 mysql_data.gram = convert 'data' structure files trunc/insert statments to force apply 'config' data an application uses
 
+Manage database 'structure' and 'app config data' from within your normal code repository, in a simpler format then raw sql.
+
 ```
 Project repository:
 	/Database/tables/
