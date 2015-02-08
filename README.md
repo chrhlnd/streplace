@@ -17,6 +17,8 @@ The collections can then be pushed through transformation logic to emit whatever
 
 The data itself, and the grammer difinitions are tokenized by another library
 
+
+## MySQL scripting
 The main itch I'm scratching here is to support script generation for mysql. So the grammer file is here along with an example.
 
 Command line help:
@@ -31,6 +33,11 @@ ex:
 	./streplace gram ./mysql.gram ./example.tab	> example.tab.sql
 
 the example files are also here.
+
+This ends up generating example.tab.sql that can just be piped into mysql and will upgrade/create tables in the 'crm' schema.
+
+The scripts as they are now will only 'add' to the schema they won't ever delete anything I generally prefer this in practice if I need to delete
+something I end up making a 1 off script and run it in a controlled manner.
 
 
 ###Short detour
