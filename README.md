@@ -39,6 +39,15 @@ This ends up generating example.tab.sql that can just be piped into mysql and wi
 The scripts as they are now will only 'add' to the schema they won't ever delete anything I generally prefer this in practice if I need to delete
 something I end up making a 1 off script and run it in a controlled manner.
 
+The indented use is to create schema structure / config data structure using the mysql.gram, and mysql_data.gram. Then version control
+the struct.tab files and the config.tab files, along with the grammer files and the tool binary. Then you can version control the structure
+of your db, and the config data just like normal code files. To deploy you run the 'streplace' command on all your files with the appropriate grammers
+generating the .sql scripts, then pipe them in to apply. You could also check in the scripts if you so desired, which might be appropriate if you're
+versioning all release artifacts.
+
+The project I used this for I wrote some stored procs to script out database tables/config data into the .tab format by inspecting the information_schema, there by having a full loop
+for all the devs on the project. They can use mysql tools to create tables like normal then script them out as .tab files and check them into version
+control or update existing ones. Then the build system just scripts everything in the .tab files and applies it to various environment databases to apply upgrades.
 
 ###Short detour
 github.com/chrhlnd/cmdlang
