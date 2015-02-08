@@ -91,7 +91,7 @@ github.com/chrhlnd/cmdlang
 
 Its a light weight format that feels natural for me to type, and has the possiblity of being stream interpreted.
 
-The rules are simple specify words seperated by white space. Carrige return is a delimiter unless its preceeded by a ','
+The rules are simple specify words seperated by white space. Carrige return is a delimiter unless the next non whitespace token is ','
 then it is an extension of the previous line.
 
 line comments are started with #
