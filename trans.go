@@ -823,6 +823,11 @@ func handleJoinColapse(data *capture, first cmdlang.TokInfo, ev *eval, out *outW
 				continue
 			}
 
+			if string(tok) == "$gidx" {
+				writeItem([]byte(strconv.FormatInt(int64(grouping), 10)))
+				continue
+			}
+
 			var n int
 			if n, err = strconv.Atoi(string(tok[1:])); err != nil {
 				return true, err
