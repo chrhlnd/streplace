@@ -63,6 +63,7 @@ type capture struct {
 	Type     *cmdlang.TokInfo
 	Settings map[string]interface{}
 	Vars     map[string]interface{}
+	Prefix   map[string]string
 	Parent   *capture
 
 	Children []*capture
@@ -128,12 +129,13 @@ func (c *capture) setVar(name string, val interface{}) {
 var gARG = []byte("!gArg")
 var gARGS = []byte("!gArgs")
 
-func newCapture(p *capture) *capture {
+func newCapture(p *capture, prefix map[string]string) *capture {
 	ret := &capture{}
 	ret.Parent = p
 	ret.RuleIdx = -1
 	ret.Settings = make(map[string]interface{})
 	ret.Vars = make(map[string]interface{})
+	ret.Prefix = prefix
 	return ret
 }
 
@@ -477,12 +479,12 @@ func (g *Grammer) evalIdent(current *capture, inTok cmdlang.TokInfo) error {
 	return nil
 }
 
-func (g *Grammer) Transform(in io.Reader, out io.Writer) error {
+func (g *Grammer) Transform(in io.Reader, out io.Writer, prefix map[string]string) error {
 	scanner := cmdlang.NewScanner(in)
 
 	var parse func(curcap *capture, depth int) error
 
-	topCapture := newCapture(nil)
+	topCapture := newCapture(nil, prefix)
 
 	addTop := func(tcap *capture) {
 		topCapture.Children = append(topCapture.Children, tcap)
@@ -499,7 +501,7 @@ func (g *Grammer) Transform(in io.Reader, out io.Writer) error {
 					return err
 				}
 			case cmdlang.TOK_BLOCK_START:
-				newCap := newCapture(curcap)
+				newCap := newCapture(curcap, prefix)
 				// log.Print("Processing block from ", inTok)
 				if err := parse(newCap, depth+1); err != nil {
 					return err
@@ -512,7 +514,7 @@ func (g *Grammer) Transform(in io.Reader, out io.Writer) error {
 			case cmdlang.TOK_EOC:
 				if depth == 0 && curcap.Type != nil {
 					addTop(curcap)
-					curcap = newCapture(nil)
+					curcap = newCapture(nil, prefix)
 				} // else this is just a blank top level line
 				if depth > 0 {
 					break PARSE
@@ -522,12 +524,12 @@ func (g *Grammer) Transform(in io.Reader, out io.Writer) error {
 
 		if depth == 0 && curcap.Type != nil {
 			addTop(curcap)
-			curcap = newCapture(nil)
+			curcap = newCapture(nil, prefix)
 		} // else this is just a blank top level line
 		return nil
 	}
 
-	if err := parse(newCapture(nil), 0); err != nil {
+	if err := parse(newCapture(nil, prefix), 0); err != nil {
 		return err
 	}
 
@@ -609,6 +611,7 @@ func getDirectiveTable() []EmitDirective {
 			EmitDirective{[]byte("!ifn"), handleIfNot},
 			EmitDirective{[]byte("!len"), handleLen},
 			EmitDirective{[]byte("!md5"), handleMd5},
+			EmitDirective{[]byte("!pfx"), handlePfx},
 		}
 	}
 	return _emitDirectives
@@ -1071,6 +1074,26 @@ func handleMd5(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (
 		hashed := fmt.Sprintf("%x", md5.Sum(buf.Bytes()))
 
 		out.Write([]byte(hashed))
+	}
+
+	return true, nil
+}
+
+func handlePfx(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	buf := wResult{}
+
+	if err := getEvalItem(data, first, ev, 1, &buf); err != nil {
+		return true, err
+	}
+
+	val := buf.String()
+
+	// fmt.Println("PFX lookup for ", val)
+	if prefix, ok := data.Prefix[val]; ok {
+		// fmt.Println("PFX found ", prefix, " for key: ", val)
+		out.Write([]byte(prefix))
+	} else {
+		// fmt.Println("PFX no data for key ", val)
 	}
 
 	return true, nil

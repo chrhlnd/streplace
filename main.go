@@ -117,7 +117,8 @@ func main() {
 	cmtPfx := "--"
 
 	printHelp := func() {
-		fmt.Println("Usage: ", arg0, "[cmt <string>] <gram file> [files ...] ... [<gram file> [files...]]")
+		fmt.Println("Usage: ", arg0, "[cmt <string>] [pfx <spec>] <gram file> [files ...] ... [<gram file> [files...]]")
+		fmt.Println("       <spec> = <id>:<string> - causes (!pfx <id>) to emit string in emission rules. ")
 	}
 
 	if len(args) == 0 {
@@ -127,6 +128,8 @@ func main() {
 
 	exitNo := 0
 
+	pfxKeys := make(map[string]string)
+
 WORK:
 	for i := 0; i < len(args); i++ {
 		option := args[i]
@@ -134,6 +137,23 @@ WORK:
 		//log.Println("Handling arg ", i, " ", option)
 
 		switch option {
+		case "pfx":
+			i++
+			if i > len(args) {
+				fmt.Println("Error: ", arg0, " pfx missing specifier <id>:stmt")
+				printHelp()
+				exitNo = 1
+				break WORK
+			}
+			if !strings.Contains(args[i], ":") {
+				fmt.Println("Error: ", arg0, " pfx <spec> - invalid spec settings `", args[i], "` must be <id>:<string><option>")
+				printHelp()
+				exitNo = 1
+				break WORK
+
+			}
+			parts := strings.Split(args[i], ":")
+			pfxKeys[parts[0]] = parts[1]
 		case "cmt":
 			i++
 			if i > len(args) {
@@ -190,7 +210,7 @@ WORK:
 				break WORK
 			}
 
-			err = gram.Transform(file, out)
+			err = gram.Transform(file, out, pfxKeys)
 			if err != nil {
 				fmt.Println("Error: '", option, "': ", err)
 
