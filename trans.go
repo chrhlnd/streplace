@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"strconv"
+	"bufio"
 
 	"github.com/chrhlnd/cmdlang"
 )
@@ -546,30 +547,90 @@ var tEOL = []byte("!eol")
 var vEOL = []byte(fmt.Sprintf("\n"))
 
 type outWriter struct {
-	out   io.Writer
-	delim []cmdlang.TokInfo
-	pad   int
+	out				io.Writer
+	delim			[]cmdlang.TokInfo
+	pad				int
+	captured		map[string]bytes.Buffer
+	activeCapture	string
+}
+
+func NewOutWriter(out io.Writer, pad int) *outWriter {
+	ret := &outWriter{out: out, pad: pad}
+	ret.captured = make(map[string]bytes.Buffer)
+	return ret
+}
+
+func (ow *outWriter) CapBegin(name string) {
+	ow.activeCapture = name
+	// log.Print("Setting active capture: ", ow.activeCapture)
+}
+
+func (ow *outWriter) CapEnd() {
+	ow.activeCapture = ""
+}
+
+func (ow *outWriter) CapPaste(name string) (int, error) {
+	if buff, ok := ow.captured[name]; ok {
+		scanner := bufio.NewScanner(&buff)
+		tn := 0
+		line := 0
+		padding := bytes.Buffer{}
+
+		for i := 0;i < ow.pad; i++ {
+			padding.WriteRune(' ')
+		}
+
+		for scanner.Scan() {
+			line++
+
+			var n int
+			var err error
+
+			if line > 1 {
+				n, err = ow.writeOut(padding.Bytes())
+				if err != nil {
+					return tn, err
+				}
+				tn += n
+			}
+
+			n, err = ow.writeOut(scanner.Bytes())
+			if err != nil {
+				return tn, err
+			}
+			tn += n
+
+			n, err = ow.writeOut(vEOL)
+			if err != nil {
+				return tn, err
+			}
+			tn += n
+		}
+		return tn, nil
+	}
+	return 0, nil
 }
 
 func (ow *outWriter) Write(data []byte) (int, error) {
 	if ow.delim != nil {
 		for _, v := range ow.delim {
-			if amt, err := ow.dowrite(v.Literal); err != nil {
+			if amt, err := ow.writePad(v.Literal); err != nil {
 				return amt, err
 			}
 		}
 		ow.delim = nil
 	}
-	return ow.dowrite(data)
+	return ow.writePad(data)
 }
 
-func (ow *outWriter) dowrite(data []byte) (int, error) {
+func (ow *outWriter) writePad(data []byte) (int, error) {
 	if bytes.Compare(data, tEOL) == 0 {
-		if n, err := ow.out.Write(vEOL); err == nil {
+		if n, err := ow.writeOut(vEOL); err == nil {
 			if ow.pad > 0 {
 				np := 0
+				// log.Print("going to pad ", ow.pad, " spaces")
 				for i := 0; i < ow.pad; i++ {
-					if x, perr := ow.out.Write(dSpace); perr != nil {
+					if x, perr := ow.writeOut(dSpace); perr != nil {
 						return n + np + x, perr
 					} else {
 						np += x
@@ -582,8 +643,22 @@ func (ow *outWriter) dowrite(data []byte) (int, error) {
 			return n, err
 		}
 	} else {
-		return ow.out.Write(data)
+		return ow.writeOut(data)
 	}
+}
+
+func (ow *outWriter) writeOut(data []byte) (int, error) {
+	if ow.activeCapture != "" {
+		buf, ok := ow.captured[ow.activeCapture]
+		if !ok {
+			buf = bytes.Buffer{}
+		}
+		buf.Write(data)
+		ow.captured[ow.activeCapture] = buf
+		return len(data), nil
+	}
+
+	return ow.out.Write(data)
 }
 
 var dSpace = []byte(" ")
@@ -612,6 +687,7 @@ func getDirectiveTable() []EmitDirective {
 			EmitDirective{[]byte("!len"), handleLen},
 			EmitDirective{[]byte("!md5"), handleMd5},
 			EmitDirective{[]byte("!pfx"), handlePfx},
+			EmitDirective{[]byte("!capture"), handleCap},
 		}
 	}
 	return _emitDirectives
@@ -727,7 +803,7 @@ func getEvalItem(data *capture, first cmdlang.TokInfo, ev *eval, pos int, result
 
 	if subev := ev.getEval(pos); subev != nil {
 		buf := bytes.Buffer{}
-		if ok, err := dispatchEval(data, *subev.getTok(0), subev, &outWriter{&buf, nil, 0}); ok {
+		if ok, err := dispatchEval(data, *subev.getTok(0), subev, NewOutWriter(&buf, 0)); ok {
 			result.Write(buf.Bytes())
 		} else {
 			return err
@@ -1079,6 +1155,38 @@ func handleMd5(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (
 	return true, nil
 }
 
+func handleCap(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
+	buf := wResult{}
+
+	if err := getEvalItem(data, first, ev, 1, &buf); err != nil {
+		return true, err
+	}
+
+	capOp := buf.String()
+
+	buf.Reset()
+	for i := 2; i < len(ev.items); i++ {
+		if err := getEvalItem(data, first, ev, i, &buf); err != nil {
+			return true, err
+		}
+	}
+
+	name := buf.String()
+
+	// log.Print("in capture command, op is ", capOp, " name: ", name)
+
+	switch capOp {
+		case "start":
+			out.CapBegin(name)
+		case "stop":
+			out.CapEnd()
+		case "paste":
+			out.CapPaste(name)
+	}
+
+	return true, nil
+}
+
 func handlePfx(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
 	buf := wResult{}
 
@@ -1133,7 +1241,7 @@ func handlePad(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (
 }
 
 func (g *Grammer) runEmit(erule emit, current *capture, outw io.Writer) error {
-	out := &outWriter{outw, nil, 0}
+	out := NewOutWriter(outw, 0)
 
 	//dumpData(current, "")
 
