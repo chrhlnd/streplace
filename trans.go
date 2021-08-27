@@ -1141,16 +1141,21 @@ func handleLen(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (
 func handleMd5(data *capture, first cmdlang.TokInfo, ev *eval, out *outWriter) (bool, error) {
 	buf := wResult{}
 
+	var collect bytes.Buffer
+
 	for i := 1; i < len(ev.items); i++ {
-		buf.Reset()
 		if err := getEvalItem(data, first, ev, i, &buf); err != nil {
 			return true, err
 		}
 
-		hashed := fmt.Sprintf("%x", md5.Sum(buf.Bytes()))
+		s := md5.Sum(buf.Bytes())
 
-		out.Write([]byte(hashed))
+		collect.Write(s[0:])
 	}
+
+	hashed := fmt.Sprintf("%x", md5.Sum(collect.Bytes()))
+
+	out.Write([]byte(hashed))
 
 	return true, nil
 }
